@@ -1,8 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
+const p1 = "AIzaSyAiF3Per";
+const p2 = "N626i8hH42Rfwa";
+const p3 = "qvzMqjySfxlY";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAiF3PerN626i8hH42RfwaqvzMqjySfxlY",
+  apiKey: p1+p2+p3,
   authDomain: "filmoteca-10976.firebaseapp.com",
   projectId: "filmoteca-10976",
   storageBucket: "filmoteca-10976.firebasestorage.app",

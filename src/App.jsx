@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+import { db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 // Poster URLs diretas do TMDB — carregam no browser do usuário
 const POSTERS = {
   "Avatar - Fogo e Cinzas":        "https://image.tmdb.org/t/p/w300/nHf61UzkfFno5X1ofIjkf9b5joL.jpg",
@@ -38,6 +40,8 @@ const POSTERS = {
   "Se Eu Fosse Você 3":            "https://image.tmdb.org/t/p/w300/seEuFosseVoce3.jpg",
   "Marfil":                        "https://image.tmdb.org/t/p/w300/marfil2026primeVideo.jpg",
   "Águas Mortais":                 "https://image.tmdb.org/t/p/w300/aguasMortais2026.jpg",
+  "Baby":                          "https://image.tmdb.org/t/p/w300/baby2024marcelo.jpg",
+  "Confia em Mim":                 "https://image.tmdb.org/t/p/w300/confiaEmMim2014.jpg",
   "Eu e Você na Toscana":          "https://image.tmdb.org/t/p/w300/youmetuscany2026.jpg",
   "Jack Ryan: Guerra Fantasma":    "https://image.tmdb.org/t/p/w300/jackryanghost2026.jpg",
   "Segredos de Guerra":            "https://image.tmdb.org/t/p/w300/qnqGbB22YJ7dSs4o6M7exAtylS5.jpg",
@@ -81,10 +85,12 @@ const SEED_WATCHED = [
   { id: 136, title: "Michael", year: 2026, genre: "Drama / Musical", rating: 10, platform: "Cinema", note: "Cinebiografia do Rei do Pop Michael Jackson, interpretado pelo sobrinho Jaafar Jackson. Retrata sua jornada desde o talento extraordinário como líder do Jackson Five até se tornar o maior entertainer do mundo. Com Nia Long, Kat Graham, Miles Teller e Colman Domingo. Segunda maior bilheteria mundial de 2026. Dir. Antoine Fuqua.", watchedDate: "09/06/2026" },
   { id: 137, title: "Viagem Sem Retorno", year: 2026, genre: "Comédia / Suspense", rating: 8, platform: "Prime Video", note: "Dan (Jason Segel) e Lisa (Samara Weaving) viajam para uma cabana isolada com a desculpa de salvar o casamento. Mas cada um esconde o mesmo plano: matar o outro. O caos aumenta quando criminosos fugitivos invadem a cabana e a briga conjugal vira luta pela sobrevivência. Dir. Jorma Taccone.", watchedDate: "10/06/2026" },
   { id: 139, title: "Águas Mortais", year: 2026, genre: "Ação / Terror", rating: 8, platform: "Cinema", note: "Voo de Los Angeles para Xangai cai no Oceano Pacífico. Os sobreviventes precisam lutar pela vida em águas infestadas de tubarões enquanto o avião afunda. Com Aaron Eckhart e Ben Kingsley. Dir. Renny Harlin.", watchedDate: "23/06/2026" },
+  { id: 140, title: "Baby", year: 2024, genre: "Drama / LGBT", rating: 8, platform: "", note: "Wellington (João Pedro Mariano), apelidado de Baby, é liberado de um centro de detenção juvenil e se vê perdido nas ruas de São Paulo. Ao conhecer Ronaldo (Ricardo Teodoro), um garoto de programa, os dois desenvolvem uma paixão conflituosa. Premiado na Semana da Crítica de Cannes 2024. Dir. Marcelo Caetano.", watchedDate: "28/06/2026" },
   { id: 124, title: "O Silêncio dos Inocentes", year: 1991, genre: "Suspense", rating: 7, platform: "", note: "A agente novata do FBI Clarice Starling (Jodie Foster) busca a ajuda do psiquiatra canibal Dr. Hannibal Lecter (Anthony Hopkins) para traçar o perfil de um serial killer que esfola suas vítimas, o Buffalo Bill. Vencedor de 5 Oscars. Dir. Jonathan Demme.", watchedDate: "25/05/2026" },
 ];
 
 const SEED_TOWATCH = [
+  { id: 141, title: "Confia em Mim", year: 2014, genre: "Suspense", platform: "Netflix", note: "Mari (Fernanda Machado), chef de cozinha que sonha em ter seu restaurante, se envolve com Caio (Mateus Solano), um charmoso investidor. Mas as coisas não são o que parecem. Thriller brasileiro disponível na Netflix. Dir. Michel Tikhomiroff." },
   { id: 138, title: "Marfil", year: 2026, genre: "Romance / Suspense", platform: "Prime Video", note: "Marfil Cortés (Ester Expósito), filha de um magnata espanhol, é sequestrada em Nova York e libertada misteriosamente. Seu pai contrata o enigmático Sebastian Moore (Hugo Diego García) como guarda-costas. Uma atração irresistível surge entre os dois. Da autora de Minha Culpa. Estreia setembro de 2026." },
   { id: 135, title: "A Odisseia", year: 2026, genre: "Épico / Ação", platform: "Cinema", note: "Dez anos após a queda de Troia, o rei Odisseu (Matt Damon) tenta voltar para Ítaca enfrentando o Ciclope Polifemo, as Sereias e deuses caprichosos. Sua esposa Penélope (Anne Hathaway) resiste aos pretendentes enquanto aguarda seu retorno. Com Tom Holland, Zendaya, Robert Pattinson e Charlize Theron. Dir. Christopher Nolan. Estreia 16/07/2026." },
   { id: 133, title: "God's Own Country", year: 2017, genre: "Drama / LGBT", platform: "", note: "Considerado por muitos o melhor filme gay de todos os tempos. Johnny, um jovem fazendeiro de Yorkshire sobrecarregado e amargurado, afoga suas frustrações em álcool. Quando contrata Gheorghe, um imigrante experiente no campo, uma relação conflituosa vai se transformando em amor profundo. Dir. Francis Lee." },
@@ -98,7 +104,7 @@ const SEED_TOWATCH = [
 ];
 
 const STARS = [1,2,3,4,5,6,7,8,9,10];
-const EMPTY_FORM = { title:"", year: new Date().getFullYear(), genre:"", platform:"", note:"", rating:7, watchedDate:"" };
+const EMPTY_FORM = { title:"", year: new Date().getFullYear(), genre:"", platform:"", note:"", userNote:"", rating:7, watchedDate:"", mediaType:"filme" };
 
 const ratingColor = (r) => r >= 9 ? "#f5c518" : r >= 7 ? "#e8a838" : "#c0392b";
 const ratingBg    = (r) => r >= 9 ? "#3a2a00" : r >= 7 ? "#2a1800" : "#2a1010";
@@ -186,22 +192,43 @@ function FilmModal({ title, film, isWatched, addTypeSelector, onSave, onClose })
       <div style={{ background:"#14121c", border:"1px solid #3a2a50", borderRadius:"16px 16px 0 0", padding:"24px 20px 36px", width:"100%", maxWidth:500, maxHeight:"90vh", overflowY:"auto" }}>
         <div style={{ fontSize:11, letterSpacing:4, color:"#f5c518", fontFamily:"monospace", marginBottom:14 }}>{title}</div>
         {addTypeSelector}
+
+        {/* Tipo: Filme ou Série */}
+        <div style={{ marginBottom:12 }}>
+          <FieldLabel label="TIPO" />
+          <div style={{ display:"flex", gap:8 }}>
+            {[{k:"filme",l:"🎬 Filme"},{k:"serie",l:"📺 Série"}].map(t=>(
+              <button key={t.k} onClick={()=>set("mediaType",t.k)} style={{
+                flex:1, padding:"8px", borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:12,
+                background:f.mediaType===t.k?"#f5c51822":"none",
+                border:f.mediaType===t.k?"1px solid #f5c518":"1px solid #3a2a40",
+                color:f.mediaType===t.k?"#f5c518":"#6a5a70",
+              }}>{t.l}</button>
+            ))}
+          </div>
+        </div>
+
         {[
-          {label:"TÍTULO *",key:"title",placeholder:"Título do filme"},
+          {label:"TÍTULO *",key:"title",placeholder:"Título do filme ou série"},
           {label:"ANO",key:"year",placeholder:"2025"},
           {label:"GÊNERO",key:"genre",placeholder:"Ex: Suspense / Ação"},
-          {label:"PLATAFORMA",key:"platform",placeholder:"Ex: Netflix, Prime..."},
-          {label:"SINOPSE",key:"note",placeholder:"Descrição ou comentário..."},
+          {label:"PLATAFORMA",key:"platform",placeholder:"Ex: Netflix, Prime, Cinema..."},
+          {label:"SINOPSE",key:"note",placeholder:"Descrição do enredo..."},
         ].map(fi=>(
           <div key={fi.key} style={{ marginBottom:10 }}>
             <FieldLabel label={fi.label} />
             <input value={f[fi.key]||""} onChange={e=>set(fi.key,e.target.value)} placeholder={fi.placeholder} style={inputStyle} />
           </div>
         ))}
+
         {isWatched && <>
           <div style={{ marginBottom:10 }}>
             <FieldLabel label="DATA QUE ASSISTIU (dd/mm/aaaa)" />
-            <input value={f.watchedDate||""} onChange={e=>set("watchedDate",e.target.value)} placeholder="ex: 22/05/2026" maxLength={10} style={{...inputStyle,fontFamily:"monospace"}} />
+            <input value={f.watchedDate||""} onChange={e=>set("watchedDate",e.target.value)} placeholder="ex: 22/07/2026" style={{...inputStyle,fontFamily:"monospace"}} />
+          </div>
+          <div style={{ marginBottom:10 }}>
+            <FieldLabel label="MINHA OPINIÃO" />
+            <textarea value={f.userNote||""} onChange={e=>set("userNote",e.target.value)} placeholder="O que você achou? Pontos fortes, fracos, momentos marcantes..." style={{...inputStyle, minHeight:80, resize:"vertical"}} />
           </div>
           <div style={{ marginBottom:14 }}>
             <FieldLabel label="NOTA (1–10)" />
@@ -229,11 +256,10 @@ function FilmModal({ title, film, isWatched, addTypeSelector, onSave, onClose })
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
 const MONTH_NAMES = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-function StatsTab({ watched }) {
-  const [viewMode, setViewMode] = useState("month"); // "month" | "year"
+function StatsTab({ watched, onEditFilm }) {
+  const [viewMode, setViewMode] = useState("month");
   const [selectedYear, setSelectedYear] = useState(null);
 
-  // Build monthly counts per year
   const byYearMonth = {};
   watched.forEach(f => {
     if (!f.watchedDate) return;
@@ -247,18 +273,26 @@ function StatsTab({ watched }) {
   const years = Object.keys(byYearMonth).sort();
   const yearCounts = years.map(y => byYearMonth[y].reduce((a,b)=>a+b,0));
   const maxYear = Math.max(...yearCounts, 1);
-
-  // For monthly drilldown
   const drillYear = selectedYear || years[years.length-1];
   const monthData = byYearMonth[drillYear] || Array(12).fill(0);
   const maxMonth = Math.max(...monthData, 1);
 
+  // Type breakdown
+  const filmes = watched.filter(f=>f.mediaType==="serie" ? false : true);
+  const series = watched.filter(f=>f.mediaType==="serie");
+
+  // Platform breakdown
+  const platformCounts = {};
+  watched.forEach(f => {
+    const p = f.platform || "Sem plataforma";
+    platformCounts[p] = (platformCounts[p]||0)+1;
+  });
+  const platforms = Object.entries(platformCounts).sort((a,b)=>b[1]-a[1]);
+  const maxPlat = Math.max(...platforms.map(p=>p[1]), 1);
+
   // Genre stats
   const genreCounts = {};
-  watched.forEach(f => {
-    const g = f.genre || "Sem gênero";
-    genreCounts[g] = (genreCounts[g]||0)+1;
-  });
+  watched.forEach(f => { const g = f.genre||"Sem gênero"; genreCounts[g]=(genreCounts[g]||0)+1; });
   const topGenres = Object.entries(genreCounts).sort((a,b)=>b[1]-a[1]).slice(0,6);
 
   // Avg rating
@@ -266,7 +300,10 @@ function StatsTab({ watched }) {
   const avg = withRating.length ? (withRating.reduce((s,f)=>s+f.rating,0)/withRating.length).toFixed(1) : "—";
   const top = [...watched].filter(f=>f.rating).sort((a,b)=>b.rating-a.rating).slice(0,3);
 
-  const BAR_COLORS = ["#f5c518","#e8a838","#0891b2","#7c3aed","#059669","#dc2626"];
+  // Incomplete items
+  const incomplete = watched.filter(f => !f.watchedDate || !f.genre || !f.rating || f.rating===7 && !f.userNote);
+
+  const BAR_COLORS = ["#f5c518","#e8a838","#0891b2","#7c3aed","#059669","#dc2626","#db2777","#65a30d"];
 
   const statBox = (label, value, sub) => (
     <div style={{ background:"#14121c", border:"1px solid #2a2030", borderRadius:10, padding:"14px 16px", flex:1, minWidth:90, textAlign:"center" }}>
@@ -276,20 +313,52 @@ function StatsTab({ watched }) {
     </div>
   );
 
+  const platColor = (p) => {
+    if (p==="Cinema") return "#f5c518";
+    if (p==="Netflix") return "#e50914";
+    if (p==="Prime Video") return "#00a8e0";
+    if (p==="Max") return "#0078ff";
+    if (p==="Disney+") return "#113ccf";
+    if (p==="Apple TV+") return "#888";
+    if (p==="Streaming") return "#059669";
+    return "#7c3aed";
+  };
+
   return (
     <div>
       {/* Summary boxes */}
-      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
-        {statBox("Total assistidos", watched.length)}
-        {statBox("Nota média", avg, "/ 10")}
-        {statBox("Ano mais ativo", years.reduce((best,y,i)=>yearCounts[i]>=(byYearMonth[best]?.reduce((a,b)=>a+b,0)||0)?y:best, years[0]), `${Math.max(...yearCounts)} filmes`)}
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:16 }}>
+        {statBox("Total", watched.length, "assistidos")}
+        {statBox("🎬 Filmes", filmes.length)}
+        {statBox("📺 Séries", series.length)}
+        {statBox("⭐ Média", avg, "/ 10")}
       </div>
+
+      {/* Incomplete indicator */}
+      {incomplete.length > 0 && (
+        <div style={{ background:"#2a1a00", border:"1px solid #f5c51855", borderRadius:10, padding:"14px 16px", marginBottom:16 }}>
+          <div style={{ fontSize:11, color:"#f5c518", fontFamily:"monospace", letterSpacing:2, marginBottom:10 }}>⚠️ {incomplete.length} ITEM(NS) COM CAMPOS INCOMPLETOS</div>
+          {incomplete.map(f=>(
+            <div key={f.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8, padding:"8px 10px", background:"#1a1000", borderRadius:7 }}>
+              <div>
+                <div style={{ fontSize:13, color:"#e8e0cc", fontWeight:"bold" }}>{f.title}</div>
+                <div style={{ fontSize:10, color:"#8a7040", marginTop:2 }}>
+                  {!f.watchedDate && "• sem data  "}
+                  {!f.genre && "• sem gênero  "}
+                  {!f.userNote && "• sem opinião"}
+                </div>
+              </div>
+              <button onClick={()=>onEditFilm(f)} style={{ background:"#f5c51822", border:"1px solid #f5c518", color:"#f5c518", borderRadius:6, padding:"5px 10px", cursor:"pointer", fontSize:11, fontFamily:"monospace" }}>✏️ Editar</button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Year/Month toggle */}
       <div style={{ display:"flex", gap:8, marginBottom:16 }}>
-        {[{k:"year",l:"📅 Por Ano"},{k:"month",l:"🗓️ Por Mês"}].map(m=>(
+        {[{k:"year",l:"📅 Por Ano"},{k:"month",l:"🗓️ Por Mês"},{k:"platform",l:"📡 Por Plataforma"}].map(m=>(
           <button key={m.k} onClick={()=>setViewMode(m.k)} style={{
-            padding:"7px 14px", borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:12,
+            flex:1, padding:"7px 6px", borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:11,
             background:viewMode===m.k?"#f5c51822":"none",
             border:viewMode===m.k?"1px solid #f5c518":"1px solid #3a2a40",
             color:viewMode===m.k?"#f5c518":"#6a5a70",
@@ -300,21 +369,15 @@ function StatsTab({ watched }) {
       {/* YEAR BAR CHART */}
       {viewMode==="year" && (
         <div style={{ background:"#14121c", border:"1px solid #2a2030", borderRadius:10, padding:"18px 16px", marginBottom:16 }}>
-          <div style={{ fontSize:10, color:"#6a5a70", fontFamily:"monospace", letterSpacing:3, marginBottom:14, textTransform:"uppercase" }}>Filmes assistidos por ano</div>
+          <div style={{ fontSize:10, color:"#6a5a70", fontFamily:"monospace", letterSpacing:3, marginBottom:14, textTransform:"uppercase" }}>Assistidos por ano</div>
           {years.map((y,i) => (
             <div key={y} style={{ marginBottom:10, cursor:"pointer" }} onClick={()=>{ setSelectedYear(y); setViewMode("month"); }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
                 <span style={{ fontSize:12, color:"#d0c0a0", fontFamily:"monospace" }}>{y}</span>
                 <span style={{ fontSize:12, fontWeight:"bold", color:"#f5c518", fontFamily:"monospace" }}>{yearCounts[i]}</span>
               </div>
-              <div style={{ background:"#1a1020", borderRadius:4, height:20, overflow:"hidden" }}>
-                <div style={{
-                  height:"100%", borderRadius:4,
-                  width:`${(yearCounts[i]/maxYear)*100}%`,
-                  background:`linear-gradient(90deg, #f5c518, #e8a838)`,
-                  transition:"width 0.5s ease",
-                  display:"flex", alignItems:"center", paddingLeft:6,
-                }} />
+              <div style={{ background:"#1a1020", borderRadius:4, height:20 }}>
+                <div style={{ height:"100%", borderRadius:4, width:`${(yearCounts[i]/maxYear)*100}%`, background:"linear-gradient(90deg,#f5c518,#e8a838)", transition:"width 0.5s" }} />
               </div>
             </div>
           ))}
@@ -342,15 +405,28 @@ function StatsTab({ watched }) {
             <div key={m} style={{ marginBottom:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3 }}>
                 <span style={{ fontSize:11, color:"#8a7a60", fontFamily:"monospace", width:28 }}>{m}</span>
-                <span style={{ fontSize:11, fontWeight:"bold", color: monthData[i]>0?"#f5c518":"#3a3030", fontFamily:"monospace" }}>{monthData[i]||"—"}</span>
+                <span style={{ fontSize:11, fontWeight:"bold", color:monthData[i]>0?"#f5c518":"#3a3030", fontFamily:"monospace" }}>{monthData[i]||"—"}</span>
               </div>
-              <div style={{ background:"#1a1020", borderRadius:3, height:14, overflow:"hidden" }}>
-                {monthData[i]>0 && <div style={{
-                  height:"100%", borderRadius:3,
-                  width:`${(monthData[i]/maxMonth)*100}%`,
-                  background:"linear-gradient(90deg,#7c3aed,#0891b2)",
-                  transition:"width 0.5s ease",
-                }} />}
+              <div style={{ background:"#1a1020", borderRadius:3, height:14 }}>
+                {monthData[i]>0 && <div style={{ height:"100%", borderRadius:3, width:`${(monthData[i]/maxMonth)*100}%`, background:"linear-gradient(90deg,#7c3aed,#0891b2)", transition:"width 0.5s" }} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* PLATFORM CHART */}
+      {viewMode==="platform" && (
+        <div style={{ background:"#14121c", border:"1px solid #2a2030", borderRadius:10, padding:"18px 16px", marginBottom:16 }}>
+          <div style={{ fontSize:10, color:"#6a5a70", fontFamily:"monospace", letterSpacing:3, marginBottom:14, textTransform:"uppercase" }}>📡 Por plataforma / onde assistiu</div>
+          {platforms.map(([plat, count]) => (
+            <div key={plat} style={{ marginBottom:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:12, color:"#d0c0a0" }}>{plat}</span>
+                <span style={{ fontSize:12, fontWeight:"bold", color:platColor(plat), fontFamily:"monospace" }}>{count}</span>
+              </div>
+              <div style={{ background:"#1a1020", borderRadius:4, height:18 }}>
+                <div style={{ height:"100%", borderRadius:4, width:`${(count/maxPlat)*100}%`, background:platColor(plat)+"99", transition:"width 0.5s" }} />
               </div>
             </div>
           ))}
@@ -364,7 +440,7 @@ function StatsTab({ watched }) {
           <div key={f.id} style={{ display:"flex", alignItems:"center", gap:10, marginBottom:10 }}>
             <span style={{ fontSize:16, width:24, textAlign:"center" }}>{["🥇","🥈","🥉"][i]}</span>
             <div style={{ flex:1 }}>
-              <div style={{ fontSize:13, color:"#e8e0cc", fontWeight:"bold" }}>{f.title}</div>
+              <div style={{ fontSize:13, color:"#e8e0cc", fontWeight:"bold" }}>{f.title} {f.mediaType==="serie"?"📺":""}</div>
               <div style={{ fontSize:10, color:"#6a5a40", fontFamily:"monospace" }}>{f.watchedDate}</div>
             </div>
             <div style={{ background:ratingBg(f.rating), border:`1.5px solid ${ratingColor(f.rating)}`, borderRadius:6, padding:"2px 8px", fontSize:15, fontWeight:"bold", color:ratingColor(f.rating), fontFamily:"monospace" }}>{f.rating}</div>
@@ -392,10 +468,16 @@ function StatsTab({ watched }) {
 }
 
 async function loadShared(key, fallback) {
-  try { const r = await window.storage.get(key, true); return JSON.parse(r.value); } catch { return fallback; }
+  try {
+    const snap = await getDoc(doc(db, "filmes", key));
+    if (snap.exists()) return snap.data().value;
+    return fallback;
+  } catch { return fallback; }
 }
 async function saveShared(key, value) {
-  try { await window.storage.set(key, JSON.stringify(value), true); } catch {}
+  try {
+    await setDoc(doc(db, "filmes", key), { value });
+  } catch(e) { console.error(e); }
 }
 
 export default function App() {
@@ -412,30 +494,49 @@ export default function App() {
   const setWatched = (fn) => {
     setWatchedRaw(prev => {
       const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("watched_v38", next);
+      saveShared("watched_v40", next);
       return next;
     });
   };
   const setToWatch = (fn) => {
     setToWatchRaw(prev => {
       const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("towatch_v38", next);
+      saveShared("towatch_v40", next);
       return next;
     });
   };
 
   useEffect(() => {
     (async () => {
-      const w = await loadShared("watched_v38", null);
-      const t = await loadShared("towatch_v38", null);
-      const seedWIds = new Set(SEED_WATCHED.map(f=>f.id));
-      const seedTIds = new Set(SEED_TOWATCH.map(f=>f.id));
-      const mergedW = w ? [...SEED_WATCHED, ...w.filter(f=>!seedWIds.has(f.id))] : SEED_WATCHED;
-      const mergedT = t ? [...SEED_TOWATCH, ...t.filter(f=>!seedTIds.has(f.id))] : SEED_TOWATCH;
-      setWatchedRaw(mergedW);
-      setToWatchRaw(mergedT);
-      saveShared("watched_v38", mergedW);
-      saveShared("towatch_v38", mergedT);
+      const w = await loadShared("watched_v40", null);
+      const t = await loadShared("towatch_v40", null);
+
+      // Se Firebase está vazio, inicializa com SEED
+      // Se Firebase tem dados, usa APENAS Firebase (source of truth)
+      // Garante que filmes do SEED que ainda não estão no Firebase sejam adicionados uma vez
+      if (w === null) {
+        setWatchedRaw(SEED_WATCHED);
+        saveShared("watched_v40", SEED_WATCHED);
+      } else {
+        // Adiciona apenas filmes do SEED que ainda não existem no Firebase (por ID)
+        const firebaseIds = new Set(w.map(f=>f.id));
+        const newFromSeed = SEED_WATCHED.filter(f=>!firebaseIds.has(f.id));
+        const merged = newFromSeed.length > 0 ? [...w, ...newFromSeed] : w;
+        if (newFromSeed.length > 0) saveShared("watched_v40", merged);
+        setWatchedRaw(merged);
+      }
+
+      if (t === null) {
+        setToWatchRaw(SEED_TOWATCH);
+        saveShared("towatch_v40", SEED_TOWATCH);
+      } else {
+        const firebaseTIds = new Set(t.map(f=>f.id));
+        const newFromSeedT = SEED_TOWATCH.filter(f=>!firebaseTIds.has(f.id));
+        const mergedT = newFromSeedT.length > 0 ? [...t, ...newFromSeedT] : t;
+        if (newFromSeedT.length > 0) saveShared("towatch_v40", mergedT);
+        setToWatchRaw(mergedT);
+      }
+
       setReady(true);
     })();
   }, []);
@@ -444,8 +545,9 @@ export default function App() {
     const film = toWatch.find(f=>f.id===id);
     if (!film) return;
     const date = datePick[id]||"";
+    const newFilm = {...film, rating, watchedDate: date};
     setToWatch(prev=>prev.filter(f=>f.id!==id));
-    setWatched(prev=>[...prev,{...film,rating,watchedDate:date}]);
+    setWatched(prev=>sortByDateDesc([...prev, newFilm]));
     setRatingPick(null);
     setDatePick(prev=>{ const n={...prev}; delete n[id]; return n; });
   };
@@ -482,6 +584,7 @@ export default function App() {
             <div style={{ flex:1 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
                 <span style={{ fontSize:15, fontWeight:"bold", color:"#fff" }}>{film.title}</span>
+                {film.mediaType==="serie" && <span style={{ fontSize:10, background:"#0891b222", color:"#38bdf8", padding:"2px 7px", borderRadius:20, fontFamily:"monospace", border:"1px solid #0891b244" }}>📺 SÉRIE</span>}
                 <span style={{ fontSize:10, color:"#6a5a40", fontFamily:"monospace" }}>{film.year}</span>
               </div>
               <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
@@ -489,6 +592,7 @@ export default function App() {
                 {film.platform && <span style={{ fontSize:10, background:"#0a0a1a", color:"#6080b0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.platform}</span>}
               </div>
               {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a50", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
+              {film.userNote && <div style={{ marginTop:5, fontSize:11, color:"#a09070", lineHeight:1.4, background:"#1a1500", padding:"6px 8px", borderRadius:6, borderLeft:"2px solid #f5c51855" }}>💬 {film.userNote}</div>}
               {film.watchedDate && <div style={{ marginTop:4, fontSize:10, color:"#5a5040", fontFamily:"monospace" }}>📅 {film.watchedDate}</div>}
             </div>
             <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, minWidth:44 }}>
@@ -531,19 +635,48 @@ export default function App() {
 
           {ratingPick===film.id ? (
             <div style={{ marginTop:10, borderTop:"1px solid #2a2030", paddingTop:10 }}>
-              <FieldLabel label="DATA QUE ASSISTIU (dd/mm/aaaa)" />
-              <input value={datePick[film.id]||""} onChange={e=>setDatePick(prev=>({...prev,[film.id]:e.target.value}))}
-                placeholder="ex: 22/05/2026" maxLength={10} style={{...inputStyle, fontFamily:"monospace", marginBottom:8}} />
-              <FieldLabel label="QUAL A NOTA? (1–10)" />
-              <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:4 }}>
-                {STARS.map(n=>(
-                  <button key={n} onClick={()=>moveToWatched(film.id,n)} style={{
-                    width:32, height:32, borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontWeight:"bold", fontSize:12,
-                    background:ratingBg(n), border:`1px solid ${ratingColor(n)}`, color:ratingColor(n),
-                  }}>{n}</button>
-                ))}
-                <button onClick={()=>setRatingPick(null)} style={{ background:"none", border:"1px solid #3a3030", color:"#6a5a50", borderRadius:6, padding:"0 8px", cursor:"pointer", fontSize:11 }}>cancelar</button>
-              </div>
+              {/* PASSO 1: Data */}
+              {!datePick[film.id+"_confirmed"] ? (
+                <>
+                  <FieldLabel label="📅 PASSO 1 — QUANDO ASSISTIU? (dd/mm/aaaa)" />
+                  <input
+                    value={datePick[film.id]||""}
+                    onChange={e=>setDatePick(prev=>({...prev,[film.id]:e.target.value}))}
+                    placeholder="ex: 22/07/2026"
+                    style={{...inputStyle, fontFamily:"monospace", marginBottom:8}}
+                  />
+                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                    <button onClick={()=>setDatePick(prev=>({...prev,[film.id+"_confirmed"]:true}))} style={{
+                      flex:2, padding:"8px", background:"#7c3aed22", border:"1px solid #7c3aed", color:"#b09ad0",
+                      borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:12,
+                    }}>Confirmar data →</button>
+                    <button onClick={()=>setRatingPick(null)} style={{
+                      flex:1, background:"none", border:"1px solid #3a3030", color:"#6a5a50",
+                      borderRadius:6, padding:"8px", cursor:"pointer", fontSize:11,
+                    }}>cancelar</button>
+                  </div>
+                </>
+              ) : (
+                /* PASSO 2: Nota */
+                <>
+                  <div style={{ fontSize:11, color:"#5a9a5a", fontFamily:"monospace", marginBottom:8 }}>
+                    📅 {datePick[film.id]||"sem data"} ✓
+                  </div>
+                  <FieldLabel label="⭐ PASSO 2 — QUAL A NOTA? (1–10)" />
+                  <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:4 }}>
+                    {STARS.map(n=>(
+                      <button key={n} onClick={()=>moveToWatched(film.id,n)} style={{
+                        width:36, height:36, borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontWeight:"bold", fontSize:13,
+                        background:ratingBg(n), border:`1px solid ${ratingColor(n)}`, color:ratingColor(n),
+                      }}>{n}</button>
+                    ))}
+                  </div>
+                  <button onClick={()=>setDatePick(prev=>{ const n={...prev}; delete n[film.id+"_confirmed"]; return n; })}
+                    style={{ marginTop:8, background:"none", border:"none", color:"#6a5a50", cursor:"pointer", fontSize:11, fontFamily:"monospace" }}>
+                    ← voltar à data
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             <button onClick={()=>setRatingPick(film.id)} style={{
@@ -569,7 +702,7 @@ export default function App() {
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
             <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Videolocadora do Claude</div>
-            <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes</h1>
+            <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
               <span>🎯 {toWatch.length} na fila</span>
@@ -609,7 +742,7 @@ export default function App() {
         )}
 
         {/* STATS TAB */}
-        {tab==="stats" && <StatsTab watched={watched} />}
+        {tab==="stats" && <StatsTab watched={watched} onEditFilm={(film)=>{ setEditData({film,from:"watched"}); setTab("watched"); }} />}
       </div>
 
       {showAdd && (
