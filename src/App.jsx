@@ -3,8 +3,7 @@ import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 // Poster URLs diretas do TMDB — carregam no browser do usuário
-const POSTERS = {const POSTERS = {};
-};
+const POSTERS = {};
 const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
 
 function usePoster(itemId, title, year) {
