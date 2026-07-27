@@ -51,6 +51,45 @@ const POSTERS = {
   "Viagem Sem Retorno":            "https://image.tmdb.org/t/p/w300/viagemSemRetorno2026.jpg",
   "Golpe Explosivo":               "https://image.tmdb.org/t/p/w300/kXfDnWgFBNvBFmYbpEBByJYthxq.jpg",
 };
+const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
+
+function usePoster(itemId, title, year) {
+  const [posterUrl, setPosterUrl] = useState(POSTERS[title] || null);
+
+  useEffect(() => {
+    if (POSTERS[title]) return;
+
+    let cancelled = false;
+
+    async function loadPoster() {
+      const ref = doc(db, "posters", String(itemId));
+      const cached = await getDoc(ref);
+      if (cached.exists()) {
+        if (!cancelled) setPosterUrl(cached.data().url);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}&year=${year || ""}&language=pt-BR`
+        );
+        const data = await res.json();
+        const path = data.results?.[0]?.poster_path;
+        if (path) {
+          const url = `https://image.tmdb.org/t/p/w300${path}`;
+          await setDoc(ref, { url, title, cachedAt: Date.now() });
+          if (!cancelled) setPosterUrl(url);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar poster TMDB:", e);
+      }
+    }
+
+    loadPoster();
+    return () => { cancelled = true; };
+  }, [itemId, title, year]);
+
+  return posterUrl;
+}
 
 const SEED_WATCHED = [
   { id: 115, title: "Avatar - Fogo e Cinzas", year: 2025, genre: "Ação", rating: 10, platform: "Cinema", note: "Jake Sully e Neytiri enfrentam o Povo das Cinzas, uma nova e violenta tribo Na'vi liderada por Varang, enquanto lidam com o luto pela perda do filho mais velho. Dir. James Cameron.", watchedDate: "04/01/2026" },
@@ -143,9 +182,9 @@ const FilmStrip = () => (
   </div>
 );
 
-function Poster({ title, size=70 }) {
-  const url = POSTERS[title];
-  const [ok, setOk] = useState(!!url);
+function Poster({ itemId, title, year, size=70 }) {
+  const url = usePoster(itemId, title, year);
+  const [ok, setOk] = useState(true);
 
   return url && ok ? (
     <img
@@ -613,7 +652,7 @@ export default function App() {
   const ToWatchCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} size={70} />
+        <Poster itemId={film.id} title={film.title} year={film.year} size={70} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
