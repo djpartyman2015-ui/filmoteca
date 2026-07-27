@@ -44,6 +44,20 @@ function usePoster(itemId, title, year) {
   return posterUrl;
 }
 
+function shareOnWhatsApp(film) {
+  const nota = film.rating ? `⭐ Minha nota: ${film.rating}/10\n` : "";
+  const opiniao = film.userNote ? `💬 "${film.userNote}"\n` : "";
+  const texto =
+    `🎬 Eu assisti *${film.title}* e lembrei de você!\n\n` +
+    `${film.genre ? `Gênero: ${film.genre}\n` : ""}` +
+    nota +
+    opiniao +
+    `\nConfere aí: ${film.note || ""}`;
+
+  const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+  window.open(url, "_blank");
+}
+
 const SEED_WATCHED = [
   { id: 115, title: "Avatar - Fogo e Cinzas", year: 2025, genre: "Ação", rating: 10, platform: "Cinema", note: "Jake Sully e Neytiri enfrentam o Povo das Cinzas, uma nova e violenta tribo Na'vi liderada por Varang, enquanto lidam com o luto pela perda do filho mais velho. Dir. James Cameron.", watchedDate: "04/01/2026" },
   { id: 122, title: "Caramelo", year: 2025, genre: "Drama", rating: 9, platform: "Netflix", note: "Pedro, um chef prestes a realizar o sonho de ter seu próprio restaurante, tem a vida revirada por um diagnóstico inesperado. Com a ajuda de um vira-lata caramelo, ele redescobre o significado da vida.", watchedDate: "05/01/2026" },
@@ -570,7 +584,7 @@ export default function App() {
   const WatchedCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} size={70} />
+        <Poster itemId={film.id} title={film.title} year={film.year} size={70} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
@@ -592,6 +606,7 @@ export default function App() {
                 {film.rating||"—"}
               </div>
               <div style={{ display:"flex", gap:4 }}>
+                <button onClick={()=>shareOnWhatsApp(film)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#4ad090", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
                 <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
                 <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
               </div>
