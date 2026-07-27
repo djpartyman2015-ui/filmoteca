@@ -45,11 +45,15 @@ function usePoster(itemId, title, year) {
 }
 
 function shareOnWhatsApp(film) {
+  const plataforma = film.platform ? `📡 Onde assisti: ${film.platform}\n` : "";
+  const data = film.watchedDate ? `📅 Assistido em: ${film.watchedDate}\n` : "";
   const nota = film.rating ? `⭐ Minha nota: ${film.rating}/10\n` : "";
   const opiniao = film.userNote ? `💬 "${film.userNote}"\n` : "";
   const texto =
     `🎬 Eu assisti *${film.title}* e lembrei de você!\n\n` +
     `${film.genre ? `Gênero: ${film.genre}\n` : ""}` +
+    plataforma +
+    data +
     nota +
     opiniao +
     `\nConfere aí: ${film.note || ""}`;
@@ -164,24 +168,38 @@ function Poster({ itemId, title, year, size=70 }) {
   );
 }
 
-function GenreCards({ films, type }) {
+function GenreCards({ films, type, selected, onSelect }) {
   const counts = {};
   films.forEach(f => { const g = f.genre||"Sem gênero"; counts[g]=(counts[g]||0)+1; });
   const genres = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   if (!genres.length) return null;
   return (
     <div style={{ marginBottom:20 }}>
-      <div style={{ fontSize:10, letterSpacing:4, color:"#6a5a70", fontFamily:"monospace", marginBottom:10, textTransform:"uppercase" }}>
-        {type==="watched" ? "📊 Gêneros assistidos" : "🎯 Gêneros na fila"}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+        <div style={{ fontSize:10, letterSpacing:4, color:"#6a5a70", fontFamily:"monospace", textTransform:"uppercase" }}>
+          {type==="watched" ? "📊 Gêneros assistidos" : "🎯 Gêneros na fila"}
+        </div>
+        {selected && (
+          <button onClick={()=>onSelect(null)} style={{ background:"none", border:"1px solid #3a2a40", color:"#f5c518", borderRadius:20, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"monospace" }}>
+            ✕ limpar filtro
+          </button>
+        )}
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {genres.map(([genre, count], i) => {
           const [c1, c2] = GENRE_COLORS[i % GENRE_COLORS.length];
+          const isSelected = selected === genre;
           return (
-            <div key={genre} style={{ background:`linear-gradient(135deg,${c1}22,${c2}33)`, border:`1px solid ${c1}55`, borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8 }}>
+            <button key={genre} onClick={()=>onSelect(isSelected ? null : genre)} style={{
+              background:`linear-gradient(135deg,${c1}22,${c2}33)`,
+              border:`1px solid ${isSelected ? c1 : c1+"55"}`,
+              boxShadow:isSelected ? `0 0 0 2px ${c1}` : "none",
+              borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8,
+              cursor:"pointer", fontFamily:"Georgia, serif",
+            }}>
               <span style={{ fontSize:12, color:"#d0c8e0" }}>{genre}</span>
               <span style={{ background:c1+"44", color:c1, borderRadius:20, padding:"1px 8px", fontSize:11, fontWeight:"bold", fontFamily:"monospace" }}>{count}</span>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -496,6 +514,7 @@ export default function App() {
   const [ratingPick, setRatingPick] = useState(null);
   const [datePick, setDatePick] = useState({});
   const [editData, setEditData] = useState(null);
+  const [genreFilter, setGenreFilter] = useState(null);
 
   const setWatched = (fn) => {
     setWatchedRaw(prev => {
@@ -708,7 +727,7 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Videolocadora do Claude</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do Andrey</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
@@ -724,7 +743,7 @@ export default function App() {
         </div>
         <div style={{ display:"flex", marginTop:18, borderBottom:"1px solid #2a2520", overflowX:"auto" }}>
           {[{key:"watched",label:`✅ Assistidos (${watched.length})`},{key:"towatch",label:`🎯 A Assistir (${toWatch.length})`},{key:"stats",label:"📊 Estatísticas"}].map(t=>(
-            <button key={t.key} onClick={()=>setTab(t.key)} style={{
+            <button key={t.key} onClick={()=>{ setTab(t.key); setGenreFilter(null); }} style={{
               background:"none", border:"none",
               borderBottom:tab===t.key?"2px solid #f5c518":"2px solid transparent",
               color:tab===t.key?"#f5c518":"#8a8070",
@@ -737,16 +756,20 @@ export default function App() {
       </div>
 
       <div style={{ padding:"20px 16px", maxWidth:720, margin:"0 auto" }}>
-        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" />}
-        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" />}
-        {tab==="watched" && (sortedWatched.length===0
-          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
-          : sortedWatched.map(f => <WatchedCard key={f.id} film={f} />)
-        )}
-        {tab==="towatch" && (toWatch.length===0
-          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
-          : toWatch.map(f => <ToWatchCard key={f.id} film={f} />)
-        )}
+        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" selected={genreFilter} onSelect={setGenreFilter} />}
+        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" selected={genreFilter} onSelect={setGenreFilter} />}
+        {tab==="watched" && (() => {
+          const filtered = genreFilter ? sortedWatched.filter(f=>(f.genre||"Sem gênero")===genreFilter) : sortedWatched;
+          return filtered.length===0
+            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme encontrado. 🍿</div>
+            : filtered.map(f => <WatchedCard key={f.id} film={f} />);
+        })()}
+        {tab==="towatch" && (() => {
+          const filtered = genreFilter ? toWatch.filter(f=>(f.genre||"Sem gênero")===genreFilter) : toWatch;
+          return filtered.length===0
+            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme encontrado. 🎬</div>
+            : filtered.map(f => <ToWatchCard key={f.id} film={f} />);
+        })()}
 
         {/* STATS TAB */}
         {tab==="stats" && <StatsTab watched={watched} onEditFilm={(film)=>{ setEditData({film,from:"watched"}); setTab("watched"); }} />}
