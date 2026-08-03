@@ -491,7 +491,7 @@ function StatsTab({ watched, onEditFilm }) {
   );
 }
 
-// ─── CARDS (movidos para fora do App para não remontar a cada tecla digitada) ──
+// ─── CARDS (fora do App para não remontar a cada tecla digitada) ──
 
 function WatchedCard({ film, setEditData, removeFilm }) {
   return (
@@ -657,30 +657,22 @@ export default function App() {
       const w = await loadShared("watched_v40", null);
       const t = await loadShared("towatch_v40", null);
 
-      // Se Firebase está vazio, inicializa com SEED
-      // Se Firebase tem dados, usa APENAS Firebase (source of truth)
-      // Garante que filmes do SEED que ainda não estão no Firebase sejam adicionados uma vez
+      // Firebase é a fonte de verdade. O SEED só é usado UMA VEZ,
+      // para inicializar o banco quando ele ainda não existe.
+      // Depois disso, nunca mais comparamos com o SEED — isso evita
+      // que filmes deletados pelo usuário "voltem" sozinhos.
       if (w === null) {
         setWatchedRaw(SEED_WATCHED);
         saveShared("watched_v40", SEED_WATCHED);
       } else {
-        // Adiciona apenas filmes do SEED que ainda não existem no Firebase (por ID)
-        const firebaseIds = new Set(w.map(f=>f.id));
-        const newFromSeed = SEED_WATCHED.filter(f=>!firebaseIds.has(f.id));
-        const merged = newFromSeed.length > 0 ? [...w, ...newFromSeed] : w;
-        if (newFromSeed.length > 0) saveShared("watched_v40", merged);
-        setWatchedRaw(merged);
+        setWatchedRaw(w);
       }
 
       if (t === null) {
         setToWatchRaw(SEED_TOWATCH);
         saveShared("towatch_v40", SEED_TOWATCH);
       } else {
-        const firebaseTIds = new Set(t.map(f=>f.id));
-        const newFromSeedT = SEED_TOWATCH.filter(f=>!firebaseTIds.has(f.id));
-        const mergedT = newFromSeedT.length > 0 ? [...t, ...newFromSeedT] : t;
-        if (newFromSeedT.length > 0) saveShared("towatch_v40", mergedT);
-        setToWatchRaw(mergedT);
+        setToWatchRaw(t);
       }
 
       setReady(true);
