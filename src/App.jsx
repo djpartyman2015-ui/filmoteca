@@ -1,66 +1,54 @@
 import { useState, useEffect } from "react";
 
-import { db } from "./firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
 // Poster URLs diretas do TMDB — carregam no browser do usuário
-const POSTERS = {};
-const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
-
-function usePoster(itemId, title, year) {
-  const [posterUrl, setPosterUrl] = useState(POSTERS[title] || null);
-
-  useEffect(() => {
-    if (POSTERS[title]) return;
-
-    let cancelled = false;
-
-    async function loadPoster() {
-      const ref = doc(db, "posters", String(itemId));
-      const cached = await getDoc(ref);
-      if (cached.exists()) {
-        if (!cancelled) setPosterUrl(cached.data().url);
-        return;
-      }
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}&year=${year || ""}&language=pt-BR`
-        );
-        const data = await res.json();
-        const path = data.results?.[0]?.poster_path;
-        if (path) {
-          const url = `https://image.tmdb.org/t/p/w300${path}`;
-          await setDoc(ref, { url, title, cachedAt: Date.now() });
-          if (!cancelled) setPosterUrl(url);
-        }
-      } catch (e) {
-        console.error("Erro ao buscar poster TMDB:", e);
-      }
-    }
-
-    loadPoster();
-    return () => { cancelled = true; };
-  }, [itemId, title, year]);
-
-  return posterUrl;
-}
-
-function shareOnWhatsApp(film) {
-  const plataforma = film.platform ? `📡 Onde assisti: ${film.platform}\n` : "";
-  const data = film.watchedDate ? `📅 Assistido em: ${film.watchedDate}\n` : "";
-  const nota = film.rating ? `⭐ Minha nota: ${film.rating}/10\n` : "";
-  const opiniao = film.userNote ? `💬 "${film.userNote}"\n` : "";
-  const texto =
-    `🎬 Eu assisti *${film.title}* e lembrei de você!\n\n` +
-    `${film.genre ? `Gênero: ${film.genre}\n` : ""}` +
-    plataforma +
-    data +
-    nota +
-    opiniao +
-    `\nConfere aí: ${film.note || ""}`;
-
-  const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
-  window.open(url, "_blank");
-}
+const POSTERS = {
+  "Avatar - Fogo e Cinzas":        "https://image.tmdb.org/t/p/w300/nHf61UzkfFno5X1ofIjkf9b5joL.jpg",
+  "Caramelo":                      "https://image.tmdb.org/t/p/w300/xDMIl84Qo5Tsu62c9DGWhmPI67A.jpg",
+  "Greenland 2 - Destruição Total":"https://image.tmdb.org/t/p/w300/fOjMDreBq0FLXzSjEQzNkO8cEVT.jpg",
+  "Pânico 7":                      "https://image.tmdb.org/t/p/w300/5oADkJGXFAFGvYvlDd0EL4Bp0Dm.jpg",
+  "Justiça Artificial - Mercy":    "https://image.tmdb.org/t/p/w300/6oom5dkOmqKFUkHyPSbzTIBuXMI.jpg",
+  "O Agente Secreto":              "https://image.tmdb.org/t/p/w300/mXLOHHc1Zeuwsl4xYKjKh2280oL.jpg",
+  "Bagagem de Risco":              "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
+  "Hamnet":                        "https://image.tmdb.org/t/p/w300/aYVRRqfGkMhBKsxBOyFQ2UjuHpT.jpg",
+  "A Empregada":                   "https://image.tmdb.org/t/p/w300/rTh4K5FEwNrXEgrDwVkq1FIxRJN.jpg",
+  "O Som da Morte":                "https://image.tmdb.org/t/p/w300/t2LpcdbIhCxJvCHXJEnD1gK4GFQ.jpg",
+  "Jogo dos Predadores":           "https://image.tmdb.org/t/p/w300/uKb22E0xDIkBBWNOoGSjMYiOqUy.jpg",
+  "O Diabo Veste Prada 2":         "https://image.tmdb.org/t/p/w300/7BWAuWaGFiTHtGGlvHvDHDltkKs.jpg",
+  "Dungeons & Dragons":            "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
+  "Meu Melhor Amigo":              "https://image.tmdb.org/t/p/w300/qnqGbB22YJ7dSs4o6M7exAtylS5.jpg",
+  "Locked":                        "https://image.tmdb.org/t/p/w300/dkckd4Gq94PBJ8GBWP0PdmNXxlq.jpg",
+  "Ice Fall":                      "https://image.tmdb.org/t/p/w300/4YZgsm9Bpkk7WZiSMFOFaIKQbBH.jpg",
+  "Rebel Ridge":                   "https://image.tmdb.org/t/p/w300/5KCVkau1HEl7ZzSPXIItu2fqHLy.jpg",
+  "Força Bruta":                   "https://image.tmdb.org/t/p/w300/z1p34vh7dEOnLJ2so7NTk3OfTsm.jpg",
+  "Good Boy":                      "https://image.tmdb.org/t/p/w300/j2HqxMQ8k8JGIFVPMTqHLrwFb6X.jpg",
+  "Maldição da Múmia":             "https://image.tmdb.org/t/p/w300/nfOOFmJR0GlRtkNIhObTr0bv4Eg.jpg",
+  "Socorro":                       "https://image.tmdb.org/t/p/w300/4FJuNbwAFBqFiGpNNXpL5BDlKYJ.jpg",
+  "O Silêncio dos Inocentes":      "https://image.tmdb.org/t/p/w300/rplLJ2hPcOQmkFhTqUte0MkEaO2.jpg",
+  "Enterramos os Mortos":          "https://image.tmdb.org/t/p/w300/6FRFIogh3zFnVWn7Z6oeajvFbgQ.jpg",
+  "Shelter":                       "https://image.tmdb.org/t/p/w300/qA5kPYZA7FkVvqnzgu8PUeB7Yku.jpg",
+  "Obsessiva":                     "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
+  "Obsessão":                      "https://image.tmdb.org/t/p/w300/d5sGgCRLbHmxFDwCQRECPmFqkbK.jpg",
+  "Firebird 2":                    "https://image.tmdb.org/t/p/w300/aozRmXcRuYbOnI3VZj2sdHjvUqQ.jpg",
+  "Cangaço Novo 2":                "https://image.tmdb.org/t/p/w300/h0MJKN84pDTAYxW3e1kLqzxk9gK.jpg",
+  "On the Sea":                    "https://image.tmdb.org/t/p/w300/7BWAuWaGFiTHtGGlvHvDHDltkKs.jpg",
+  "Jurado Nº 2":                   "https://image.tmdb.org/t/p/w300/5BGLWvqJrBmFl7xjDerILVxG6qR.jpg",
+  "Código Preto":                  "https://image.tmdb.org/t/p/w300/bXi6IQiQDHD00JFio5ZSZOeJNPn.jpg",
+  "Casa de Dinamite":              "https://image.tmdb.org/t/p/w300/oX9RYPR4WtTVVCO8B08oNL3bvkE.jpg",
+  "Mestres do Universo":           "https://image.tmdb.org/t/p/w300/xYHHJ9benFkoKbS0pVHJhFcPpbz.jpg",
+  "Se Eu Fosse Você 3":            "https://image.tmdb.org/t/p/w300/seEuFosseVoce3.jpg",
+  "Marfil":                        "https://image.tmdb.org/t/p/w300/marfil2026primeVideo.jpg",
+  "Águas Mortais":                 "https://image.tmdb.org/t/p/w300/aguasMortais2026.jpg",
+  "Baby":                          "https://image.tmdb.org/t/p/w300/baby2024marcelo.jpg",
+  "Confia em Mim":                 "https://image.tmdb.org/t/p/w300/confiaEmMim2014.jpg",
+  "Eu e Você na Toscana":          "https://image.tmdb.org/t/p/w300/youmetuscany2026.jpg",
+  "Jack Ryan: Guerra Fantasma":    "https://image.tmdb.org/t/p/w300/jackryanghost2026.jpg",
+  "Segredos de Guerra":            "https://image.tmdb.org/t/p/w300/qnqGbB22YJ7dSs4o6M7exAtylS5.jpg",
+  "God's Own Country":             "https://image.tmdb.org/t/p/w300/lMTQ4WiOc9O0EMiH7SYs1tzdVLb.jpg",
+  "A Odisseia":                    "https://image.tmdb.org/t/p/w300/odisseia2026nolan.jpg",
+  "Michael":                       "https://image.tmdb.org/t/p/w300/michael2026jackson.jpg",
+  "Viagem Sem Retorno":            "https://image.tmdb.org/t/p/w300/viagemSemRetorno2026.jpg",
+  "Golpe Explosivo":               "https://image.tmdb.org/t/p/w300/kXfDnWgFBNvBFmYbpEBByJYthxq.jpg",
+};
 
 const SEED_WATCHED = [
   { id: 115, title: "Avatar - Fogo e Cinzas", year: 2025, genre: "Ação", rating: 10, platform: "Cinema", note: "Jake Sully e Neytiri enfrentam o Povo das Cinzas, uma nova e violenta tribo Na'vi liderada por Varang, enquanto lidam com o luto pela perda do filho mais velho. Dir. James Cameron.", watchedDate: "04/01/2026" },
@@ -100,11 +88,8 @@ const SEED_WATCHED = [
 ];
 
 const SEED_TOWATCH = [
-  { id: 141, title: "Confia em Mim", year: 2014, genre: "Suspense", platform: "Netflix", note: "Mari (Fernanda Machado), chef de cozinha que sonha em ter seu restaurante, se envolve com Caio (Mateus Solano), um charmoso investidor. Mas as coisas não são o que parecem. Thriller brasileiro disponível na Netflix. Dir. Michel Tikhomiroff." },
   { id: 138, title: "Marfil", year: 2026, genre: "Romance / Suspense", platform: "Prime Video", note: "Marfil Cortés (Ester Expósito), filha de um magnata espanhol, é sequestrada em Nova York e libertada misteriosamente. Seu pai contrata o enigmático Sebastian Moore (Hugo Diego García) como guarda-costas. Uma atração irresistível surge entre os dois. Da autora de Minha Culpa. Estreia setembro de 2026." },
-  { id: 135, title: "A Odisseia", year: 2026, genre: "Épico / Ação", platform: "Cinema", note: "Dez anos após a queda de Troia, o rei Odisseu (Matt Damon) tenta voltar para Ítaca enfrentando o Ciclope Polifemo, as Sereias e deuses caprichosos. Sua esposa Penélope (Anne Hathaway) resiste aos pretendentes enquanto aguarda seu retorno. Com Tom Holland, Zendaya, Robert Pattinson e Charlize Theron. Dir. Christopher Nolan. Estreia 16/07/2026." },
   { id: 133, title: "God's Own Country", year: 2017, genre: "Drama / LGBT", platform: "", note: "Considerado por muitos o melhor filme gay de todos os tempos. Johnny, um jovem fazendeiro de Yorkshire sobrecarregado e amargurado, afoga suas frustrações em álcool. Quando contrata Gheorghe, um imigrante experiente no campo, uma relação conflituosa vai se transformando em amor profundo. Dir. Francis Lee." },
-  { id: 127, title: "Mestres do Universo", year: 2026, genre: "Ação / Fantasia", platform: "Cinema", note: "O Príncipe Adam retorna a Eternia após 15 anos na Terra para se tornar He-Man e enfrentar Esqueleto. Com Nicholas Galitzine, Jared Leto, Camila Mendes e Idris Elba. Participação especial de Dolph Lundgren. Dir. Travis Knight. Estreia 04/06/2026." },
   { id: 129, title: "Se Eu Fosse Você 3", year: 2026, genre: "Comédia", platform: "Cinema", note: "Duas décadas após a última troca de corpos, Cláudio (Tony Ramos) e Helena (Glória Pires) vivem nova fase ao lado da filha Bia (Cleo Pires), adulta e casada com Aquiles (Rafael Infante). O raio cai novamente e a família toda precisa se colocar no lugar do outro — literalmente. Dir. Anita Barbosa. Estreia 04/06/2026." },
   { id: 107, title: "Cangaço Novo 2", year: 2025, genre: "", platform: "", note: "" },
   { id: 106, title: "On the Sea", year: 2025, genre: "Drama", platform: "", note: "Drama britânico ambientado numa comunidade pesqueira do País de Gales que explora masculinidade, desejo e identidade. Com Barry Ward e Lorne MacFadyen. Dir. Helen Walsh." },
@@ -153,9 +138,9 @@ const FilmStrip = () => (
   </div>
 );
 
-function Poster({ itemId, title, year, size=70 }) {
-  const url = usePoster(itemId, title, year);
-  const [ok, setOk] = useState(true);
+function Poster({ title, size=70 }) {
+  const url = POSTERS[title];
+  const [ok, setOk] = useState(!!url);
 
   return url && ok ? (
     <img
@@ -168,38 +153,24 @@ function Poster({ itemId, title, year, size=70 }) {
   );
 }
 
-function GenreCards({ films, type, selected, onSelect }) {
+function GenreCards({ films, type }) {
   const counts = {};
   films.forEach(f => { const g = f.genre||"Sem gênero"; counts[g]=(counts[g]||0)+1; });
   const genres = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
   if (!genres.length) return null;
   return (
     <div style={{ marginBottom:20 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-        <div style={{ fontSize:10, letterSpacing:4, color:"#6a5a70", fontFamily:"monospace", textTransform:"uppercase" }}>
-          {type==="watched" ? "📊 Gêneros assistidos" : "🎯 Gêneros na fila"}
-        </div>
-        {selected && (
-          <button onClick={()=>onSelect(null)} style={{ background:"none", border:"1px solid #3a2a40", color:"#f5c518", borderRadius:20, padding:"3px 10px", fontSize:11, cursor:"pointer", fontFamily:"monospace" }}>
-            ✕ limpar filtro
-          </button>
-        )}
+      <div style={{ fontSize:10, letterSpacing:4, color:"#6a5a70", fontFamily:"monospace", marginBottom:10, textTransform:"uppercase" }}>
+        {type==="watched" ? "📊 Gêneros assistidos" : "🎯 Gêneros na fila"}
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {genres.map(([genre, count], i) => {
           const [c1, c2] = GENRE_COLORS[i % GENRE_COLORS.length];
-          const isSelected = selected === genre;
           return (
-            <button key={genre} onClick={()=>onSelect(isSelected ? null : genre)} style={{
-              background:`linear-gradient(135deg,${c1}22,${c2}33)`,
-              border:`1px solid ${isSelected ? c1 : c1+"55"}`,
-              boxShadow:isSelected ? `0 0 0 2px ${c1}` : "none",
-              borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8,
-              cursor:"pointer", fontFamily:"Georgia, serif",
-            }}>
+            <div key={genre} style={{ background:`linear-gradient(135deg,${c1}22,${c2}33)`, border:`1px solid ${c1}55`, borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8 }}>
               <span style={{ fontSize:12, color:"#d0c8e0" }}>{genre}</span>
               <span style={{ background:c1+"44", color:c1, borderRadius:20, padding:"1px 8px", fontSize:11, fontWeight:"bold", fontFamily:"monospace" }}>{count}</span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -491,13 +462,112 @@ function StatsTab({ watched, onEditFilm }) {
   );
 }
 
-// ─── CARDS (fora do App para não remontar a cada tecla digitada) ──
+async function loadShared(key, fallback) {
+  try { const r = await window.storage.get(key, true); return JSON.parse(r.value); } catch { return fallback; }
+}
+async function saveShared(key, value) {
+  try { await window.storage.set(key, JSON.stringify(value), true); } catch {}
+}
 
-function WatchedCard({ film, setEditData, removeFilm }) {
-  return (
+export default function App() {
+  const [watched, setWatchedRaw] = useState([]);
+  const [toWatch, setToWatchRaw] = useState([]);
+  const [ready, setReady] = useState(false);
+  const [tab, setTab] = useState("watched");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addType, setAddType] = useState("towatch");
+  const [ratingPick, setRatingPick] = useState(null);
+  const [datePick, setDatePick] = useState({});
+  const [editData, setEditData] = useState(null);
+
+  const setWatched = (fn) => {
+    setWatchedRaw(prev => {
+      const next = typeof fn==="function" ? fn(prev) : fn;
+      saveShared("watched_v40", next);
+      return next;
+    });
+  };
+  const setToWatch = (fn) => {
+    setToWatchRaw(prev => {
+      const next = typeof fn==="function" ? fn(prev) : fn;
+      saveShared("towatch_v40", next);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    (async () => {
+      const w = await loadShared("watched_v40", null);
+      const t = await loadShared("towatch_v40", null);
+
+      // Se Firebase está vazio, inicializa com SEED
+      // Se Firebase tem dados, usa APENAS Firebase (source of truth)
+      // Garante que filmes do SEED que ainda não estão no Firebase sejam adicionados uma vez
+      if (w === null) {
+        setWatchedRaw(SEED_WATCHED);
+        saveShared("watched_v40", SEED_WATCHED);
+      } else {
+        // Adiciona apenas filmes do SEED que ainda não existem no Firebase (por ID)
+        const firebaseIds = new Set(w.map(f=>f.id));
+        const newFromSeed = SEED_WATCHED.filter(f=>!firebaseIds.has(f.id));
+        const merged = newFromSeed.length > 0 ? [...w, ...newFromSeed] : w;
+        if (newFromSeed.length > 0) saveShared("watched_v40", merged);
+        setWatchedRaw(merged);
+      }
+
+      if (t === null) {
+        setToWatchRaw(SEED_TOWATCH);
+        saveShared("towatch_v40", SEED_TOWATCH);
+      } else {
+        const firebaseTIds = new Set(t.map(f=>f.id));
+        const newFromSeedT = SEED_TOWATCH.filter(f=>!firebaseTIds.has(f.id));
+        const mergedT = newFromSeedT.length > 0 ? [...t, ...newFromSeedT] : t;
+        if (newFromSeedT.length > 0) saveShared("towatch_v40", mergedT);
+        setToWatchRaw(mergedT);
+      }
+
+      setReady(true);
+    })();
+  }, []);
+
+  const moveToWatched = (id, rating) => {
+    const film = toWatch.find(f=>f.id===id);
+    if (!film) return;
+    const date = datePick[id]||"";
+    const newFilm = {...film, rating, watchedDate: date};
+    setToWatch(prev=>prev.filter(f=>f.id!==id));
+    setWatched(prev=>sortByDateDesc([...prev, newFilm]));
+    setRatingPick(null);
+    setDatePick(prev=>{ const n={...prev}; delete n[id]; return n; });
+  };
+
+  const removeFilm = (id, from) => {
+    if (from==="watched") setWatched(prev=>prev.filter(f=>f.id!==id));
+    else setToWatch(prev=>prev.filter(f=>f.id!==id));
+  };
+
+  const saveNew = (form) => {
+    const newFilm = {...form, id:Date.now(), year:Number(form.year)};
+    if (addType==="watched") setWatched(prev=>[...prev, newFilm]);
+    else setToWatch(prev=>[newFilm,...prev]);
+    setShowAdd(false);
+  };
+
+  const saveEdit = (updated) => {
+    const upd = {...updated, year:Number(updated.year)};
+    if (editData.from==="watched") setWatched(prev=>prev.map(f=>f.id===upd.id?upd:f));
+    else setToWatch(prev=>prev.map(f=>f.id===upd.id?upd:f));
+    setEditData(null);
+  };
+
+  const sortedWatched = sortByDateDesc(watched);
+  const avgRating = watched.length
+    ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
+
+  const WatchedCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster itemId={film.id} title={film.title} year={film.year} size={70} />
+        <Poster title={film.title} size={70} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
@@ -519,7 +589,6 @@ function WatchedCard({ film, setEditData, removeFilm }) {
                 {film.rating||"—"}
               </div>
               <div style={{ display:"flex", gap:4 }}>
-                <button onClick={()=>shareOnWhatsApp(film)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#4ad090", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
                 <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
                 <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
               </div>
@@ -529,13 +598,11 @@ function WatchedCard({ film, setEditData, removeFilm }) {
       </div>
     </div>
   );
-}
 
-function ToWatchCard({ film, setEditData, removeFilm, ratingPick, setRatingPick, datePick, setDatePick, moveToWatched }) {
-  return (
+  const ToWatchCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster itemId={film.id} title={film.title} year={film.year} size={70} />
+        <Poster title={film.title} size={70} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
@@ -610,108 +677,6 @@ function ToWatchCard({ film, setEditData, removeFilm, ratingPick, setRatingPick,
       </div>
     </div>
   );
-}
-
-async function loadShared(key, fallback) {
-  try {
-    const snap = await getDoc(doc(db, "filmes", key));
-    if (snap.exists()) return snap.data().value;
-    return fallback;
-  } catch { return fallback; }
-}
-async function saveShared(key, value) {
-  try {
-    await setDoc(doc(db, "filmes", key), { value });
-  } catch(e) { console.error(e); }
-}
-
-export default function App() {
-  const [watched, setWatchedRaw] = useState([]);
-  const [toWatch, setToWatchRaw] = useState([]);
-  const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState("watched");
-  const [showAdd, setShowAdd] = useState(false);
-  const [addType, setAddType] = useState("towatch");
-  const [ratingPick, setRatingPick] = useState(null);
-  const [datePick, setDatePick] = useState({});
-  const [editData, setEditData] = useState(null);
-  const [genreFilter, setGenreFilter] = useState(null);
-
-  const setWatched = (fn) => {
-    setWatchedRaw(prev => {
-      const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("watched_v40", next);
-      return next;
-    });
-  };
-  const setToWatch = (fn) => {
-    setToWatchRaw(prev => {
-      const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("towatch_v40", next);
-      return next;
-    });
-  };
-
-  useEffect(() => {
-    (async () => {
-      const w = await loadShared("watched_v40", null);
-      const t = await loadShared("towatch_v40", null);
-
-      // Firebase é a fonte de verdade. O SEED só é usado UMA VEZ,
-      // para inicializar o banco quando ele ainda não existe.
-      // Depois disso, nunca mais comparamos com o SEED — isso evita
-      // que filmes deletados pelo usuário "voltem" sozinhos.
-      if (w === null) {
-        setWatchedRaw(SEED_WATCHED);
-        saveShared("watched_v40", SEED_WATCHED);
-      } else {
-        setWatchedRaw(w);
-      }
-
-      if (t === null) {
-        setToWatchRaw(SEED_TOWATCH);
-        saveShared("towatch_v40", SEED_TOWATCH);
-      } else {
-        setToWatchRaw(t);
-      }
-
-      setReady(true);
-    })();
-  }, []);
-
-  const moveToWatched = (id, rating) => {
-    const film = toWatch.find(f=>f.id===id);
-    if (!film) return;
-    const date = datePick[id]||"";
-    const newFilm = {...film, rating, watchedDate: date};
-    setToWatch(prev=>prev.filter(f=>f.id!==id));
-    setWatched(prev=>sortByDateDesc([...prev, newFilm]));
-    setRatingPick(null);
-    setDatePick(prev=>{ const n={...prev}; delete n[id]; return n; });
-  };
-
-  const removeFilm = (id, from) => {
-    if (from==="watched") setWatched(prev=>prev.filter(f=>f.id!==id));
-    else setToWatch(prev=>prev.filter(f=>f.id!==id));
-  };
-
-  const saveNew = (form) => {
-    const newFilm = {...form, id:Date.now(), year:Number(form.year)};
-    if (addType==="watched") setWatched(prev=>[...prev, newFilm]);
-    else setToWatch(prev=>[newFilm,...prev]);
-    setShowAdd(false);
-  };
-
-  const saveEdit = (updated) => {
-    const upd = {...updated, year:Number(updated.year)};
-    if (editData.from==="watched") setWatched(prev=>prev.map(f=>f.id===upd.id?upd:f));
-    else setToWatch(prev=>prev.map(f=>f.id===upd.id?upd:f));
-    setEditData(null);
-  };
-
-  const sortedWatched = sortByDateDesc(watched);
-  const avgRating = watched.length
-    ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
@@ -725,13 +690,14 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do Andrey</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Videolocadora do Claude</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
               <span>🎯 {toWatch.length} na fila</span>
               <span>⭐ Média: <strong style={{ color:"#f5c518" }}>{avgRating}</strong></span>
               <span style={{ color:"#3a8a3a", fontSize:10 }}>🌐 lista compartilhada</span>
+              <button onClick={async ()=>{ setReady(false); setTimeout(()=>window.location.reload(), 100); }} title="Forçar recarregamento do cache" style={{ background:"none", border:"1px solid #2a2a3a", color:"#4a4a6a", borderRadius:5, padding:"2px 7px", fontSize:10, cursor:"pointer", fontFamily:"monospace", letterSpacing:0.5 }}>↺</button>
             </div>
           </div>
           <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
@@ -741,7 +707,7 @@ export default function App() {
         </div>
         <div style={{ display:"flex", marginTop:18, borderBottom:"1px solid #2a2520", overflowX:"auto" }}>
           {[{key:"watched",label:`✅ Assistidos (${watched.length})`},{key:"towatch",label:`🎯 A Assistir (${toWatch.length})`},{key:"stats",label:"📊 Estatísticas"}].map(t=>(
-            <button key={t.key} onClick={()=>{ setTab(t.key); setGenreFilter(null); }} style={{
+            <button key={t.key} onClick={()=>setTab(t.key)} style={{
               background:"none", border:"none",
               borderBottom:tab===t.key?"2px solid #f5c518":"2px solid transparent",
               color:tab===t.key?"#f5c518":"#8a8070",
@@ -754,32 +720,16 @@ export default function App() {
       </div>
 
       <div style={{ padding:"20px 16px", maxWidth:720, margin:"0 auto" }}>
-        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" selected={genreFilter} onSelect={setGenreFilter} />}
-        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" selected={genreFilter} onSelect={setGenreFilter} />}
-        {tab==="watched" && (() => {
-          const filtered = genreFilter ? sortedWatched.filter(f=>(f.genre||"Sem gênero")===genreFilter) : sortedWatched;
-          return filtered.length===0
-            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme encontrado. 🍿</div>
-            : filtered.map(f => <WatchedCard key={f.id} film={f} setEditData={setEditData} removeFilm={removeFilm} />);
-        })()}
-        {tab==="towatch" && (() => {
-          const filtered = genreFilter ? toWatch.filter(f=>(f.genre||"Sem gênero")===genreFilter) : toWatch;
-          return filtered.length===0
-            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme encontrado. 🎬</div>
-            : filtered.map(f => (
-                <ToWatchCard
-                  key={f.id}
-                  film={f}
-                  setEditData={setEditData}
-                  removeFilm={removeFilm}
-                  ratingPick={ratingPick}
-                  setRatingPick={setRatingPick}
-                  datePick={datePick}
-                  setDatePick={setDatePick}
-                  moveToWatched={moveToWatched}
-                />
-              ));
-        })()}
+        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" />}
+        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" />}
+        {tab==="watched" && (sortedWatched.length===0
+          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
+          : sortedWatched.map(f => <WatchedCard key={f.id} film={f} />)
+        )}
+        {tab==="towatch" && (toWatch.length===0
+          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
+          : toWatch.map(f => <ToWatchCard key={f.id} film={f} />)
+        )}
 
         {/* STATS TAB */}
         {tab==="stats" && <StatsTab watched={watched} onEditFilm={(film)=>{ setEditData({film,from:"watched"}); setTab("watched"); }} />}
