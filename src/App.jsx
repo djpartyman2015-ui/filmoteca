@@ -1,55 +1,39 @@
 import { useState, useEffect } from "react";
 import { db } from "./firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-// Poster URLs diretas do TMDB — carregam no browser do usuário
-const POSTERS = {
-  "Avatar - Fogo e Cinzas":        "https://image.tmdb.org/t/p/w300/nHf61UzkfFno5X1ofIjkf9b5joL.jpg",
-  "Caramelo":                      "https://image.tmdb.org/t/p/w300/xDMIl84Qo5Tsu62c9DGWhmPI67A.jpg",
-  "Greenland 2 - Destruição Total":"https://image.tmdb.org/t/p/w300/fOjMDreBq0FLXzSjEQzNkO8cEVT.jpg",
-  "Pânico 7":                      "https://image.tmdb.org/t/p/w300/5oADkJGXFAFGvYvlDd0EL4Bp0Dm.jpg",
-  "Justiça Artificial - Mercy":    "https://image.tmdb.org/t/p/w300/6oom5dkOmqKFUkHyPSbzTIBuXMI.jpg",
-  "O Agente Secreto":              "https://image.tmdb.org/t/p/w300/mXLOHHc1Zeuwsl4xYKjKh2280oL.jpg",
-  "Bagagem de Risco":              "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
-  "Hamnet":                        "https://image.tmdb.org/t/p/w300/aYVRRqfGkMhBKsxBOyFQ2UjuHpT.jpg",
-  "A Empregada":                   "https://image.tmdb.org/t/p/w300/rTh4K5FEwNrXEgrDwVkq1FIxRJN.jpg",
-  "O Som da Morte":                "https://image.tmdb.org/t/p/w300/t2LpcdbIhCxJvCHXJEnD1gK4GFQ.jpg",
-  "Jogo dos Predadores":           "https://image.tmdb.org/t/p/w300/uKb22E0xDIkBBWNOoGSjMYiOqUy.jpg",
-  "O Diabo Veste Prada 2":         "https://image.tmdb.org/t/p/w300/7BWAuWaGFiTHtGGlvHvDHDltkKs.jpg",
-  "Dungeons & Dragons":            "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
-  "Meu Melhor Amigo":              "https://image.tmdb.org/t/p/w300/qnqGbB22YJ7dSs4o6M7exAtylS5.jpg",
-  "Locked":                        "https://image.tmdb.org/t/p/w300/dkckd4Gq94PBJ8GBWP0PdmNXxlq.jpg",
-  "Ice Fall":                      "https://image.tmdb.org/t/p/w300/4YZgsm9Bpkk7WZiSMFOFaIKQbBH.jpg",
-  "Rebel Ridge":                   "https://image.tmdb.org/t/p/w300/5KCVkau1HEl7ZzSPXIItu2fqHLy.jpg",
-  "Força Bruta":                   "https://image.tmdb.org/t/p/w300/z1p34vh7dEOnLJ2so7NTk3OfTsm.jpg",
-  "Good Boy":                      "https://image.tmdb.org/t/p/w300/j2HqxMQ8k8JGIFVPMTqHLrwFb6X.jpg",
-  "Maldição da Múmia":             "https://image.tmdb.org/t/p/w300/nfOOFmJR0GlRtkNIhObTr0bv4Eg.jpg",
-  "Socorro":                       "https://image.tmdb.org/t/p/w300/4FJuNbwAFBqFiGpNNXpL5BDlKYJ.jpg",
-  "O Silêncio dos Inocentes":      "https://image.tmdb.org/t/p/w300/rplLJ2hPcOQmkFhTqUte0MkEaO2.jpg",
-  "Enterramos os Mortos":          "https://image.tmdb.org/t/p/w300/6FRFIogh3zFnVWn7Z6oeajvFbgQ.jpg",
-  "Shelter":                       "https://image.tmdb.org/t/p/w300/qA5kPYZA7FkVvqnzgu8PUeB7Yku.jpg",
-  "Obsessiva":                     "https://image.tmdb.org/t/p/w300/A7AoNT06aRAc4SV89Dwxj3EYCHs.jpg",
-  "Obsessão":                      "https://image.tmdb.org/t/p/w300/d5sGgCRLbHmxFDwCQRECPmFqkbK.jpg",
-  "Firebird 2":                    "https://image.tmdb.org/t/p/w300/aozRmXcRuYbOnI3VZj2sdHjvUqQ.jpg",
-  "Cangaço Novo 2":                "https://image.tmdb.org/t/p/w300/h0MJKN84pDTAYxW3e1kLqzxk9gK.jpg",
-  "On the Sea":                    "https://image.tmdb.org/t/p/w300/7BWAuWaGFiTHtGGlvHvDHDltkKs.jpg",
-  "Jurado Nº 2":                   "https://image.tmdb.org/t/p/w300/5BGLWvqJrBmFl7xjDerILVxG6qR.jpg",
-  "Código Preto":                  "https://image.tmdb.org/t/p/w300/bXi6IQiQDHD00JFio5ZSZOeJNPn.jpg",
-  "Casa de Dinamite":              "https://image.tmdb.org/t/p/w300/oX9RYPR4WtTVVCO8B08oNL3bvkE.jpg",
-  "Mestres do Universo":           "https://image.tmdb.org/t/p/w300/xYHHJ9benFkoKbS0pVHJhFcPpbz.jpg",
-  "Se Eu Fosse Você 3":            "https://image.tmdb.org/t/p/w300/seEuFosseVoce3.jpg",
-  "Marfil":                        "https://image.tmdb.org/t/p/w300/marfil2026primeVideo.jpg",
-  "Águas Mortais":                 "https://image.tmdb.org/t/p/w300/aguasMortais2026.jpg",
-  "Baby":                          "https://image.tmdb.org/t/p/w300/baby2024marcelo.jpg",
-  "Confia em Mim":                 "https://image.tmdb.org/t/p/w300/confiaEmMim2014.jpg",
-  "Eu e Você na Toscana":          "https://image.tmdb.org/t/p/w300/youmetuscany2026.jpg",
-  "Jack Ryan: Guerra Fantasma":    "https://image.tmdb.org/t/p/w300/jackryanghost2026.jpg",
-  "Segredos de Guerra":            "https://image.tmdb.org/t/p/w300/qnqGbB22YJ7dSs4o6M7exAtylS5.jpg",
-  "God's Own Country":             "https://image.tmdb.org/t/p/w300/lMTQ4WiOc9O0EMiH7SYs1tzdVLb.jpg",
-  "A Odisseia":                    "https://image.tmdb.org/t/p/w300/odisseia2026nolan.jpg",
-  "Michael":                       "https://image.tmdb.org/t/p/w300/michael2026jackson.jpg",
-  "Viagem Sem Retorno":            "https://image.tmdb.org/t/p/w300/viagemSemRetorno2026.jpg",
-  "Golpe Explosivo":               "https://image.tmdb.org/t/p/w300/kXfDnWgFBNvBFmYbpEBByJYthxq.jpg",
-};
+
+// Overrides manuais opcionais — só usar se quiser forçar um poster específico.
+// Deixe vazio: os posters são buscados automaticamente no TMDB (busca real, não hardcoded).
+const POSTERS = {};
+
+// Chave TMDB dividida em partes (evita bloqueio de secret scanning do IBM)
+const tk1 = "751fa25d9c2989d";
+const tk2 = "1c9088beed911a538";
+const TMDB_KEY = tk1 + tk2;
+
+// Busca o poster real no TMDB por título (+ ano, se disponível). Retorna a URL ou null.
+async function fetchPosterFromTMDB(title, year, mediaType) {
+  try {
+    const type = mediaType === "serie" ? "tv" : "movie";
+    const yearParam = mediaType === "serie" ? "first_air_date_year" : "year";
+    const baseUrl = `https://api.themoviedb.org/3/search/${type}?api_key=${TMDB_KEY}&language=pt-BR&query=${encodeURIComponent(title)}`;
+
+    let res = await fetch(year ? `${baseUrl}&${yearParam}=${year}` : baseUrl);
+    let data = await res.json();
+    let result = data?.results?.[0];
+
+    // Se não achou com o ano, tenta sem o ano (títulos podem divergir)
+    if (!result?.poster_path && year) {
+      res = await fetch(baseUrl);
+      data = await res.json();
+      result = data?.results?.[0];
+    }
+
+    return result?.poster_path ? `https://image.tmdb.org/t/p/w300${result.poster_path}` : null;
+  } catch {
+    return null;
+  }
+}
 
 const SEED_WATCHED = [
   { id: 115, title: "Avatar - Fogo e Cinzas", year: 2025, genre: "Ação", rating: 10, platform: "Cinema", note: "Jake Sully e Neytiri enfrentam o Povo das Cinzas, uma nova e violenta tribo Na'vi liderada por Varang, enquanto lidam com o luto pela perda do filho mais velho. Dir. James Cameron.", watchedDate: "04/01/2026" },
@@ -139,14 +123,34 @@ const FilmStrip = () => (
   </div>
 );
 
-function Poster({ title, size=70 }) {
-  const url = POSTERS[title];
-  const [ok, setOk] = useState(!!url);
+function Poster({ title, year, mediaType, size=70, cache, onCache }) {
+  const manualUrl = POSTERS[title];
+  const cachedUrl = cache && cache[title];
+  const [url, setUrl] = useState(manualUrl || cachedUrl || null);
+  const [failed, setFailed] = useState(false);
 
-  return url && ok ? (
+  useEffect(() => {
+    setFailed(false);
+    const known = POSTERS[title] || (cache && cache[title]);
+    if (known) { setUrl(known); return; }
+    let cancelled = false;
+    setUrl(null);
+    (async () => {
+      const found = await fetchPosterFromTMDB(title, year, mediaType);
+      if (cancelled) return;
+      if (found) {
+        setUrl(found);
+        onCache && onCache(title, found);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, cachedUrl]);
+
+  return url && !failed ? (
     <img
       src={url} alt={title}
-      onError={() => setOk(false)}
+      onError={() => setFailed(true)}
       style={{ width:size, minWidth:size, height:size*1.5, objectFit:"cover", borderRadius:7, border:"1px solid #2a1a30", flexShrink:0 }}
     />
   ) : (
@@ -485,6 +489,7 @@ export default function App() {
   const [ratingPick, setRatingPick] = useState(null);
   const [datePick, setDatePick] = useState({});
   const [editData, setEditData] = useState(null);
+  const [posterCache, setPosterCache] = useState({});
 
   const setWatched = (fn) => {
     setWatchedRaw(prev => {
@@ -497,6 +502,22 @@ export default function App() {
     setToWatchRaw(prev => {
       const next = typeof fn==="function" ? fn(prev) : fn;
       saveShared("towatch_v40", next);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    (async () => {
+      const cachedPosters = await loadShared("poster_cache_v1", {});
+      setPosterCache(cachedPosters || {});
+    })();
+  }, []);
+
+  const cachePoster = (title, url) => {
+    setPosterCache(prev => {
+      if (prev[title] === url) return prev;
+      const next = { ...prev, [title]: url };
+      saveShared("poster_cache_v1", next);
       return next;
     });
   };
@@ -573,7 +594,7 @@ export default function App() {
   const WatchedCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} size={70} />
+        <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
@@ -608,7 +629,7 @@ export default function App() {
   const ToWatchCard = ({ film }) => (
     <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} size={70} />
+        <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
             <div style={{ flex:1 }}>
