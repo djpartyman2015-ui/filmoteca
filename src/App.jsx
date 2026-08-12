@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-
+import { db } from "./firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 // Poster URLs diretas do TMDB — carregam no browser do usuário
 const POSTERS = {
   "Avatar - Fogo e Cinzas":        "https://image.tmdb.org/t/p/w300/nHf61UzkfFno5X1ofIjkf9b5joL.jpg",
@@ -463,12 +464,17 @@ function StatsTab({ watched, onEditFilm }) {
 }
 
 async function loadShared(key, fallback) {
-  try { const r = await window.storage.get(key, true); return JSON.parse(r.value); } catch { return fallback; }
+  try {
+    const snap = await getDoc(doc(db, "filmes", key));
+    if (snap.exists()) return snap.data().value;
+    return fallback;
+  } catch { return fallback; }
 }
 async function saveShared(key, value) {
-  try { await window.storage.set(key, JSON.stringify(value), true); } catch {}
+  try {
+    await setDoc(doc(db, "filmes", key), { value });
+  } catch(e) { console.error(e); }
 }
-
 export default function App() {
   const [watched, setWatchedRaw] = useState([]);
   const [toWatch, setToWatchRaw] = useState([]);
