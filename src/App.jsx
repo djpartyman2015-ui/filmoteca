@@ -158,7 +158,7 @@ function Poster({ title, year, mediaType, size=70, cache, onCache }) {
   );
 }
 
-function GenreCards({ films, type }) {
+function GenreCards({ films, type, selected, onSelect }) {
   const counts = {};
   films.forEach(f => { const g = f.genre||"Sem gênero"; counts[g]=(counts[g]||0)+1; });
   const genres = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
@@ -171,8 +171,16 @@ function GenreCards({ films, type }) {
       <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
         {genres.map(([genre, count], i) => {
           const [c1, c2] = GENRE_COLORS[i % GENRE_COLORS.length];
+          const isActive = selected === genre;
           return (
-            <div key={genre} style={{ background:`linear-gradient(135deg,${c1}22,${c2}33)`, border:`1px solid ${c1}55`, borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8 }}>
+            <div key={genre} onClick={()=>onSelect && onSelect(isActive ? null : genre)}
+              style={{
+                background:`linear-gradient(135deg,${c1}22,${c2}33)`,
+                border:`1px solid ${isActive ? c1 : c1+"55"}`,
+                boxShadow: isActive ? `0 0 0 2px ${c1}` : "none",
+                borderRadius:10, padding:"7px 12px", display:"flex", alignItems:"center", gap:8,
+                cursor: onSelect ? "pointer" : "default",
+              }}>
               <span style={{ fontSize:12, color:"#d0c8e0" }}>{genre}</span>
               <span style={{ background:c1+"44", color:c1, borderRadius:20, padding:"1px 8px", fontSize:11, fontWeight:"bold", fontFamily:"monospace" }}>{count}</span>
             </div>
@@ -181,6 +189,19 @@ function GenreCards({ films, type }) {
       </div>
     </div>
   );
+}
+
+function shareFilm(film, isWatched) {
+  const parts = [];
+  if (isWatched && film.watchedDate) parts.push(`Assisti em ${film.watchedDate} e me lembrei de você:`);
+  parts.push(`🎬 *${film.title}*${film.year ? " ("+film.year+")" : ""}`);
+  if (film.genre) parts.push(`Gênero: ${film.genre}`);
+  if (film.platform) parts.push(`Onde assistir: ${film.platform}`);
+  if (isWatched && film.rating) parts.push(`Minha nota: ${film.rating}/10`);
+  if (film.note) parts.push(`Sinopse: ${film.note}`);
+  if (isWatched && film.userNote) parts.push(`Minha opinião: ${film.userNote}`);
+  const text = encodeURIComponent(parts.join("\n"));
+  window.open(`https://wa.me/?text=${text}`, "_blank");
 }
 
 function FilmModal({ title, film, isWatched, addTypeSelector, onSave, onClose }) {
@@ -490,6 +511,7 @@ export default function App() {
   const [datePick, setDatePick] = useState({});
   const [editData, setEditData] = useState(null);
   const [posterCache, setPosterCache] = useState({});
+  const [genreFilter, setGenreFilter] = useState(null);
 
   const setWatched = (fn) => {
     setWatchedRaw(prev => {
@@ -616,6 +638,7 @@ export default function App() {
                 {film.rating||"—"}
               </div>
               <div style={{ display:"flex", gap:4 }}>
+                <button onClick={()=>shareFilm(film,true)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
                 <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
                 <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
               </div>
@@ -644,6 +667,7 @@ export default function App() {
               {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a60", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
             </div>
             <div style={{ display:"flex", gap:4, alignItems:"flex-start" }}>
+              <button onClick={()=>shareFilm(film,false)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
               <button onClick={()=>setEditData({film,from:"towatch"})} style={{ background:"none", border:"1px solid #3a2a50", color:"#9a7aba", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
               <button onClick={()=>removeFilm(film.id,"towatch")} style={{ background:"none", border:"none", color:"#4a3a3a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
             </div>
@@ -734,7 +758,7 @@ export default function App() {
         </div>
         <div style={{ display:"flex", marginTop:18, borderBottom:"1px solid #2a2520", overflowX:"auto" }}>
           {[{key:"watched",label:`✅ Assistidos (${watched.length})`},{key:"towatch",label:`🎯 A Assistir (${toWatch.length})`},{key:"stats",label:"📊 Estatísticas"}].map(t=>(
-            <button key={t.key} onClick={()=>setTab(t.key)} style={{
+            <button key={t.key} onClick={()=>{setTab(t.key); setGenreFilter(null);}} style={{
               background:"none", border:"none",
               borderBottom:tab===t.key?"2px solid #f5c518":"2px solid transparent",
               color:tab===t.key?"#f5c518":"#8a8070",
@@ -747,16 +771,20 @@ export default function App() {
       </div>
 
       <div style={{ padding:"20px 16px", maxWidth:720, margin:"0 auto" }}>
-        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" />}
-        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" />}
-        {tab==="watched" && (sortedWatched.length===0
-          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
-          : sortedWatched.map(f => <WatchedCard key={f.id} film={f} />)
-        )}
-        {tab==="towatch" && (toWatch.length===0
-          ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
-          : toWatch.map(f => <ToWatchCard key={f.id} film={f} />)
-        )}
+        {tab==="towatch" && <GenreCards films={toWatch} type="towatch" selected={genreFilter} onSelect={setGenreFilter} />}
+        {tab==="watched" && <GenreCards films={sortedWatched} type="watched" selected={genreFilter} onSelect={setGenreFilter} />}
+        {tab==="watched" && (() => {
+          const filtered = genreFilter ? sortedWatched.filter(f => (f.genre||"Sem gênero")===genreFilter) : sortedWatched;
+          return filtered.length===0
+            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
+            : filtered.map(f => <WatchedCard key={f.id} film={f} />);
+        })()}
+        {tab==="towatch" && (() => {
+          const filtered = genreFilter ? toWatch.filter(f => (f.genre||"Sem gênero")===genreFilter) : toWatch;
+          return filtered.length===0
+            ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
+            : filtered.map(f => <ToWatchCard key={f.id} film={f} />);
+        })()}
 
         {/* STATS TAB */}
         {tab==="stats" && <StatsTab watched={watched} onEditFilm={(film)=>{ setEditData({film,from:"watched"}); setTab("watched"); }} />}
