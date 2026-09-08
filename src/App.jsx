@@ -500,6 +500,122 @@ async function saveShared(key, value) {
     await setDoc(doc(db, "filmes", key), { value });
   } catch(e) { console.error(e); }
 }
+const WatchedCard = ({ film, posterCache, cachePoster, setEditData, removeFilm }) => (
+  <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
+    <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+      <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+              <span style={{ fontSize:15, fontWeight:"bold", color:"#fff" }}>{film.title}</span>
+              {film.mediaType==="serie" && <span style={{ fontSize:10, background:"#0891b222", color:"#38bdf8", padding:"2px 7px", borderRadius:20, fontFamily:"monospace", border:"1px solid #0891b244" }}>📺 SÉRIE</span>}
+              <span style={{ fontSize:10, color:"#6a5a40", fontFamily:"monospace" }}>{film.year}</span>
+            </div>
+            <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
+              {film.genre && <span style={{ fontSize:10, background:"#1a1200", color:"#b09040", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.genre}</span>}
+              {film.platform && <span style={{ fontSize:10, background:"#0a0a1a", color:"#6080b0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.platform}</span>}
+            </div>
+            {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a50", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
+            {film.userNote && <div style={{ marginTop:5, fontSize:11, color:"#a09070", lineHeight:1.4, background:"#1a1500", padding:"6px 8px", borderRadius:6, borderLeft:"2px solid #f5c51855" }}>💬 {film.userNote}</div>}
+            {film.watchedDate && <div style={{ marginTop:4, fontSize:10, color:"#5a5040", fontFamily:"monospace" }}>📅 {film.watchedDate}</div>}
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, minWidth:44 }}>
+            <div style={{ background:ratingBg(film.rating||0), border:`1.5px solid ${ratingColor(film.rating||0)}`, borderRadius:8, padding:"3px 8px", fontSize:18, fontWeight:"bold", color:ratingColor(film.rating||0), fontFamily:"monospace", minWidth:36, textAlign:"center" }}>
+              {film.rating||"—"}
+            </div>
+            <div style={{ display:"flex", gap:4 }}>
+              <button onClick={()=>shareFilm(film,true)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
+              <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
+              <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, ratingPick, setRatingPick, datePick, setDatePick, moveToWatched }) => (
+  <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
+    <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
+      <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+              <span style={{ fontSize:15, fontWeight:"bold", color:"#fff" }}>{film.title}</span>
+              <span style={{ fontSize:10, color:"#6a5a80", fontFamily:"monospace" }}>{film.year}</span>
+            </div>
+            <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
+              {film.genre && <span style={{ fontSize:10, background:"#2a1a40", color:"#b09ad0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.genre}</span>}
+              {film.platform && <span style={{ fontSize:10, background:"#1a1a30", color:"#7090d0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.platform}</span>}
+            </div>
+            {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a60", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
+          </div>
+          <div style={{ display:"flex", gap:4, alignItems:"flex-start" }}>
+            <button onClick={()=>shareFilm(film,false)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
+            <button onClick={()=>setEditData({film,from:"towatch"})} style={{ background:"none", border:"1px solid #3a2a50", color:"#9a7aba", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
+            <button onClick={()=>removeFilm(film.id,"towatch")} style={{ background:"none", border:"none", color:"#4a3a3a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
+          </div>
+        </div>
+
+        {ratingPick===film.id ? (
+          <div style={{ marginTop:10, borderTop:"1px solid #2a2030", paddingTop:10 }}>
+            {/* PASSO 1: Data */}
+            {!datePick[film.id+"_confirmed"] ? (
+              <>
+                <FieldLabel label="📅 PASSO 1 — QUANDO ASSISTIU? (dd/mm/aaaa)" />
+                <input
+                  value={datePick[film.id]||""}
+                  onChange={e=>setDatePick(prev=>({...prev,[film.id]:e.target.value}))}
+                  placeholder="ex: 22/07/2026"
+                  style={{...inputStyle, fontFamily:"monospace", marginBottom:8}}
+                />
+                <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                  <button onClick={()=>setDatePick(prev=>({...prev,[film.id+"_confirmed"]:true}))} style={{
+                    flex:2, padding:"8px", background:"#7c3aed22", border:"1px solid #7c3aed", color:"#b09ad0",
+                    borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:12,
+                  }}>Confirmar data →</button>
+                  <button onClick={()=>setRatingPick(null)} style={{
+                    flex:1, background:"none", border:"1px solid #3a3030", color:"#6a5a50",
+                    borderRadius:6, padding:"8px", cursor:"pointer", fontSize:11,
+                  }}>cancelar</button>
+                </div>
+              </>
+            ) : (
+              /* PASSO 2: Nota */
+              <>
+                <div style={{ fontSize:11, color:"#5a9a5a", fontFamily:"monospace", marginBottom:8 }}>
+                  📅 {datePick[film.id]||"sem data"} ✓
+                </div>
+                <FieldLabel label="⭐ PASSO 2 — QUAL A NOTA? (1–10)" />
+                <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:4 }}>
+                  {STARS.map(n=>(
+                    <button key={n} onClick={()=>moveToWatched(film.id,n)} style={{
+                      width:36, height:36, borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontWeight:"bold", fontSize:13,
+                      background:ratingBg(n), border:`1px solid ${ratingColor(n)}`, color:ratingColor(n),
+                    }}>{n}</button>
+                  ))}
+                </div>
+                <button onClick={()=>setDatePick(prev=>{ const n={...prev}; delete n[film.id+"_confirmed"]; return n; })}
+                  style={{ marginTop:8, background:"none", border:"none", color:"#6a5a50", cursor:"pointer", fontSize:11, fontFamily:"monospace" }}>
+                  ← voltar à data
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <button onClick={()=>setRatingPick(film.id)} style={{
+            marginTop:8, background:"none", border:"1px solid #3a2a50", color:"#9a7aba",
+            borderRadius:6, padding:"4px 10px", fontSize:10, cursor:"pointer", fontFamily:"monospace",
+          }}>✅ Marcar como assistido</button>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
 export default function App() {
   const [watched, setWatchedRaw] = useState([]);
   const [toWatch, setToWatchRaw] = useState([]);
@@ -613,122 +729,6 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
-  const WatchedCard = ({ film }) => (
-    <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
-      <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
-            <div style={{ flex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                <span style={{ fontSize:15, fontWeight:"bold", color:"#fff" }}>{film.title}</span>
-                {film.mediaType==="serie" && <span style={{ fontSize:10, background:"#0891b222", color:"#38bdf8", padding:"2px 7px", borderRadius:20, fontFamily:"monospace", border:"1px solid #0891b244" }}>📺 SÉRIE</span>}
-                <span style={{ fontSize:10, color:"#6a5a40", fontFamily:"monospace" }}>{film.year}</span>
-              </div>
-              <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                {film.genre && <span style={{ fontSize:10, background:"#1a1200", color:"#b09040", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.genre}</span>}
-                {film.platform && <span style={{ fontSize:10, background:"#0a0a1a", color:"#6080b0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.platform}</span>}
-              </div>
-              {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a50", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
-              {film.userNote && <div style={{ marginTop:5, fontSize:11, color:"#a09070", lineHeight:1.4, background:"#1a1500", padding:"6px 8px", borderRadius:6, borderLeft:"2px solid #f5c51855" }}>💬 {film.userNote}</div>}
-              {film.watchedDate && <div style={{ marginTop:4, fontSize:10, color:"#5a5040", fontFamily:"monospace" }}>📅 {film.watchedDate}</div>}
-            </div>
-            <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6, minWidth:44 }}>
-              <div style={{ background:ratingBg(film.rating||0), border:`1.5px solid ${ratingColor(film.rating||0)}`, borderRadius:8, padding:"3px 8px", fontSize:18, fontWeight:"bold", color:ratingColor(film.rating||0), fontFamily:"monospace", minWidth:36, textAlign:"center" }}>
-                {film.rating||"—"}
-              </div>
-              <div style={{ display:"flex", gap:4 }}>
-                <button onClick={()=>shareFilm(film,true)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
-                <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
-                <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const ToWatchCard = ({ film }) => (
-    <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
-      <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
-        <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
-            <div style={{ flex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                <span style={{ fontSize:15, fontWeight:"bold", color:"#fff" }}>{film.title}</span>
-                <span style={{ fontSize:10, color:"#6a5a80", fontFamily:"monospace" }}>{film.year}</span>
-              </div>
-              <div style={{ display:"flex", gap:5, marginTop:4, flexWrap:"wrap" }}>
-                {film.genre && <span style={{ fontSize:10, background:"#2a1a40", color:"#b09ad0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.genre}</span>}
-                {film.platform && <span style={{ fontSize:10, background:"#1a1a30", color:"#7090d0", padding:"2px 7px", borderRadius:20, fontFamily:"monospace" }}>{film.platform}</span>}
-              </div>
-              {film.note && <div style={{ marginTop:5, fontSize:11, color:"#7a6a60", fontStyle:"italic", lineHeight:1.4 }}>{film.note}</div>}
-            </div>
-            <div style={{ display:"flex", gap:4, alignItems:"flex-start" }}>
-              <button onClick={()=>shareFilm(film,false)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
-              <button onClick={()=>setEditData({film,from:"towatch"})} style={{ background:"none", border:"1px solid #3a2a50", color:"#9a7aba", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
-              <button onClick={()=>removeFilm(film.id,"towatch")} style={{ background:"none", border:"none", color:"#4a3a3a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
-            </div>
-          </div>
-
-          {ratingPick===film.id ? (
-            <div style={{ marginTop:10, borderTop:"1px solid #2a2030", paddingTop:10 }}>
-              {/* PASSO 1: Data */}
-              {!datePick[film.id+"_confirmed"] ? (
-                <>
-                  <FieldLabel label="📅 PASSO 1 — QUANDO ASSISTIU? (dd/mm/aaaa)" />
-                  <input
-                    value={datePick[film.id]||""}
-                    onChange={e=>setDatePick(prev=>({...prev,[film.id]:e.target.value}))}
-                    placeholder="ex: 22/07/2026"
-                    style={{...inputStyle, fontFamily:"monospace", marginBottom:8}}
-                  />
-                  <div style={{ display:"flex", gap:8, marginTop:4 }}>
-                    <button onClick={()=>setDatePick(prev=>({...prev,[film.id+"_confirmed"]:true}))} style={{
-                      flex:2, padding:"8px", background:"#7c3aed22", border:"1px solid #7c3aed", color:"#b09ad0",
-                      borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontSize:12,
-                    }}>Confirmar data →</button>
-                    <button onClick={()=>setRatingPick(null)} style={{
-                      flex:1, background:"none", border:"1px solid #3a3030", color:"#6a5a50",
-                      borderRadius:6, padding:"8px", cursor:"pointer", fontSize:11,
-                    }}>cancelar</button>
-                  </div>
-                </>
-              ) : (
-                /* PASSO 2: Nota */
-                <>
-                  <div style={{ fontSize:11, color:"#5a9a5a", fontFamily:"monospace", marginBottom:8 }}>
-                    📅 {datePick[film.id]||"sem data"} ✓
-                  </div>
-                  <FieldLabel label="⭐ PASSO 2 — QUAL A NOTA? (1–10)" />
-                  <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginTop:4 }}>
-                    {STARS.map(n=>(
-                      <button key={n} onClick={()=>moveToWatched(film.id,n)} style={{
-                        width:36, height:36, borderRadius:6, cursor:"pointer", fontFamily:"monospace", fontWeight:"bold", fontSize:13,
-                        background:ratingBg(n), border:`1px solid ${ratingColor(n)}`, color:ratingColor(n),
-                      }}>{n}</button>
-                    ))}
-                  </div>
-                  <button onClick={()=>setDatePick(prev=>{ const n={...prev}; delete n[film.id+"_confirmed"]; return n; })}
-                    style={{ marginTop:8, background:"none", border:"none", color:"#6a5a50", cursor:"pointer", fontSize:11, fontFamily:"monospace" }}>
-                    ← voltar à data
-                  </button>
-                </>
-              )}
-            </div>
-          ) : (
-            <button onClick={()=>setRatingPick(film.id)} style={{
-              marginTop:8, background:"none", border:"1px solid #3a2a50", color:"#9a7aba",
-              borderRadius:6, padding:"4px 10px", fontSize:10, cursor:"pointer", fontFamily:"monospace",
-            }}>✅ Marcar como assistido</button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
       🎬 CARREGANDO...
@@ -741,7 +741,7 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Videolocadora do Claude</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do Andrey</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
@@ -777,13 +777,13 @@ export default function App() {
           const filtered = genreFilter ? sortedWatched.filter(f => (f.genre||"Sem gênero")===genreFilter) : sortedWatched;
           return filtered.length===0
             ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
-            : filtered.map(f => <WatchedCard key={f.id} film={f} />);
+            : filtered.map(f => <WatchedCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} />);
         })()}
         {tab==="towatch" && (() => {
           const filtered = genreFilter ? toWatch.filter(f => (f.genre||"Sem gênero")===genreFilter) : toWatch;
           return filtered.length===0
             ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
-            : filtered.map(f => <ToWatchCard key={f.id} film={f} />);
+            : filtered.map(f => <ToWatchCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} ratingPick={ratingPick} setRatingPick={setRatingPick} datePick={datePick} setDatePick={setDatePick} moveToWatched={moveToWatched} />);
         })()}
 
         {/* STATS TAB */}
