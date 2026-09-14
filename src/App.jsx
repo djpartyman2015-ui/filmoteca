@@ -684,7 +684,7 @@ function ProfileAvatar({ id, size=100, photoUrl, editable, onUpload }) {
 
 function ProfileSelector({ onSelect, photos, onUploadPhoto }) {
   return (
-    <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:36, fontFamily:"Georgia, serif" }}>
+    <div style={{ minHeight:"100vh", width:"100%", maxWidth:"100vw", overflowX:"hidden", boxSizing:"border-box", background:"#0a0a0f", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:36, fontFamily:"Georgia, serif" }}>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:32, marginBottom:8 }}>🎬</div>
         <div style={{ fontSize:11, letterSpacing:5, color:"#f5c518", textTransform:"uppercase", fontFamily:"monospace" }}>Filmoteca</div>
@@ -857,7 +857,7 @@ export default function App() {
   );
 
   return (
-    <div style={{ minHeight:"100vh", background:"#0a0a0f", fontFamily:"Georgia, serif", color:"#e8e0cc", paddingBottom:60 }}>
+    <div style={{ minHeight:"100vh", width:"100%", maxWidth:"100vw", overflowX:"hidden", boxSizing:"border-box", background:"#0a0a0f", fontFamily:"Georgia, serif", color:"#e8e0cc", paddingBottom:60 }}>
       <div style={{ background:"linear-gradient(180deg,#0d0d14,#0a0a0f)", borderBottom:"1px solid #f5c51830", padding:"28px 20px 0", overflow:"hidden" }}>
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
@@ -897,7 +897,7 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ padding:"20px 16px", maxWidth:720, margin:"0 auto" }}>
+      <div style={{ padding:"20px 16px", maxWidth:720, margin:"0 auto", boxSizing:"border-box" }}>
         {tab==="towatch" && <GenreCards films={toWatch} type="towatch" selected={genreFilter} onSelect={setGenreFilter} />}
         {tab==="watched" && <GenreCards films={sortedWatched} type="watched" selected={genreFilter} onSelect={setGenreFilter} />}
         {tab==="watched" && (() => {
