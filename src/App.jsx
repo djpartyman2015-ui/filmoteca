@@ -616,7 +616,45 @@ const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, 
   </div>
 );
 
+// Perfis de usuário — cada um com sua própria lista separada no Firebase
+const PROFILES = {
+  andrey: { name: "Andrey", initial: "A", color: "#f5c518", photo: null },
+  rejane: { name: "Rejane", initial: "R", color: "#e0669a", photo: null },
+};
+
+function ProfileAvatar({ id, size=100 }) {
+  const p = PROFILES[id];
+  return p.photo ? (
+    <img src={p.photo} alt={p.name} style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", border:`2px solid ${p.color}` }} />
+  ) : (
+    <div style={{ width:size, height:size, borderRadius:"50%", background:`${p.color}22`, border:`2px solid ${p.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.4, fontWeight:"bold", color:p.color, fontFamily:"Georgia, serif" }}>
+      {p.initial}
+    </div>
+  );
+}
+
+function ProfileSelector({ onSelect }) {
+  return (
+    <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:36, fontFamily:"Georgia, serif" }}>
+      <div style={{ textAlign:"center" }}>
+        <div style={{ fontSize:32, marginBottom:8 }}>🎬</div>
+        <div style={{ fontSize:11, letterSpacing:5, color:"#f5c518", textTransform:"uppercase", fontFamily:"monospace" }}>Filmoteca</div>
+        <div style={{ fontSize:14, color:"#8a8070", marginTop:6 }}>Quem está usando?</div>
+      </div>
+      <div style={{ display:"flex", gap:40 }}>
+        {Object.keys(PROFILES).map(id => (
+          <div key={id} onClick={()=>onSelect(id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, cursor:"pointer" }}>
+            <ProfileAvatar id={id} size={100} />
+            <span style={{ color:"#e8e0cc", fontSize:15 }}>{PROFILES[id].name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
+  const [profile, setProfile] = useState(() => localStorage.getItem("filmoteca_profile") || null);
   const [watched, setWatchedRaw] = useState([]);
   const [toWatch, setToWatchRaw] = useState([]);
   const [ready, setReady] = useState(false);
@@ -629,17 +667,32 @@ export default function App() {
   const [posterCache, setPosterCache] = useState({});
   const [genreFilter, setGenreFilter] = useState(null);
 
+  // Andrey mantém as chaves originais (dados já existentes). Rejane usa chaves próprias, separadas.
+  const watchedKey = profile==="rejane" ? "watched_v40_rejane" : "watched_v40";
+  const towatchKey = profile==="rejane" ? "towatch_v40_rejane" : "towatch_v40";
+
+  const selectProfile = (id) => {
+    localStorage.setItem("filmoteca_profile", id);
+    setProfile(id);
+  };
+  const switchProfile = () => {
+    localStorage.removeItem("filmoteca_profile");
+    setProfile(null);
+    setReady(false);
+    setWatchedRaw([]); setToWatchRaw([]);
+  };
+
   const setWatched = (fn) => {
     setWatchedRaw(prev => {
       const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("watched_v40", next);
+      saveShared(watchedKey, next);
       return next;
     });
   };
   const setToWatch = (fn) => {
     setToWatchRaw(prev => {
       const next = typeof fn==="function" ? fn(prev) : fn;
-      saveShared("towatch_v40", next);
+      saveShared(towatchKey, next);
       return next;
     });
   };
@@ -661,39 +714,43 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (!profile) return;
     (async () => {
-      const w = await loadShared("watched_v40", null);
-      const t = await loadShared("towatch_v40", null);
+      const w = await loadShared(watchedKey, null);
+      const t = await loadShared(towatchKey, null);
+      // SEED (filmes pré-existentes) só se aplica ao perfil do Andrey — Rejane começa com lista própria vazia
+      const seedW = profile==="andrey" ? SEED_WATCHED : [];
+      const seedT = profile==="andrey" ? SEED_TOWATCH : [];
 
       // Se Firebase está vazio, inicializa com SEED
       // Se Firebase tem dados, usa APENAS Firebase (source of truth)
       // Garante que filmes do SEED que ainda não estão no Firebase sejam adicionados uma vez
       if (w === null) {
-        setWatchedRaw(SEED_WATCHED);
-        saveShared("watched_v40", SEED_WATCHED);
+        setWatchedRaw(seedW);
+        saveShared(watchedKey, seedW);
       } else {
         // Adiciona apenas filmes do SEED que ainda não existem no Firebase (por ID)
         const firebaseIds = new Set(w.map(f=>f.id));
-        const newFromSeed = SEED_WATCHED.filter(f=>!firebaseIds.has(f.id));
+        const newFromSeed = seedW.filter(f=>!firebaseIds.has(f.id));
         const merged = newFromSeed.length > 0 ? [...w, ...newFromSeed] : w;
-        if (newFromSeed.length > 0) saveShared("watched_v40", merged);
+        if (newFromSeed.length > 0) saveShared(watchedKey, merged);
         setWatchedRaw(merged);
       }
 
       if (t === null) {
-        setToWatchRaw(SEED_TOWATCH);
-        saveShared("towatch_v40", SEED_TOWATCH);
+        setToWatchRaw(seedT);
+        saveShared(towatchKey, seedT);
       } else {
         const firebaseTIds = new Set(t.map(f=>f.id));
-        const newFromSeedT = SEED_TOWATCH.filter(f=>!firebaseTIds.has(f.id));
+        const newFromSeedT = seedT.filter(f=>!firebaseTIds.has(f.id));
         const mergedT = newFromSeedT.length > 0 ? [...t, ...newFromSeedT] : t;
-        if (newFromSeedT.length > 0) saveShared("towatch_v40", mergedT);
+        if (newFromSeedT.length > 0) saveShared(towatchKey, mergedT);
         setToWatchRaw(mergedT);
       }
 
       setReady(true);
     })();
-  }, []);
+  }, [profile]);
 
   const moveToWatched = (id, rating) => {
     const film = toWatch.find(f=>f.id===id);
@@ -729,6 +786,8 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
+  if (!profile) return <ProfileSelector onSelect={selectProfile} />;
+
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
       🎬 CARREGANDO...
@@ -741,7 +800,7 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do Andrey</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do {PROFILES[profile].name}</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
@@ -751,10 +810,16 @@ export default function App() {
               <button onClick={async ()=>{ setReady(false); setTimeout(()=>window.location.reload(), 100); }} title="Forçar recarregamento do cache" style={{ background:"none", border:"1px solid #2a2a3a", color:"#4a4a6a", borderRadius:5, padding:"2px 7px", fontSize:10, cursor:"pointer", fontFamily:"monospace", letterSpacing:0.5 }}>↺</button>
             </div>
           </div>
-          <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
-            background:"#f5c518", color:"#0a0a0f", border:"none", borderRadius:6,
-            padding:"10px 16px", fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace", letterSpacing:1,
-          }}>+ ADICIONAR</button>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div onClick={switchProfile} title="Trocar usuário" style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
+              <ProfileAvatar id={profile} size={34} />
+              <span style={{ fontSize:11, color:"#6a5a70", fontFamily:"monospace" }}>trocar</span>
+            </div>
+            <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
+              background:"#f5c518", color:"#0a0a0f", border:"none", borderRadius:6,
+              padding:"10px 16px", fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace", letterSpacing:1,
+            }}>+ ADICIONAR</button>
+          </div>
         </div>
         <div style={{ display:"flex", marginTop:18, borderBottom:"1px solid #2a2520", overflowX:"auto" }}>
           {[{key:"watched",label:`✅ Assistidos (${watched.length})`},{key:"towatch",label:`🎯 A Assistir (${toWatch.length})`},{key:"stats",label:"📊 Estatísticas"}].map(t=>(
