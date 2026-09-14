@@ -661,13 +661,14 @@ function ProfileAvatar({ id, size=100, photoUrl, editable, onUpload }) {
       )}
       {editable && (
         <>
-          <label style={{
+          <label onClick={e=>e.stopPropagation()} style={{
             position:"absolute", bottom:-2, right:-2, width:size*0.32, height:size*0.32, minWidth:20, minHeight:20,
             background:"#1a1520", border:`1.5px solid ${p.color}`, borderRadius:"50%",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:size*0.16,
           }}>
             📷
             <input type="file" accept="image/*" style={{ display:"none" }}
+              onClick={e=>e.stopPropagation()}
               onChange={async e=>{
                 const file = e.target.files?.[0];
                 if (!file) return;
