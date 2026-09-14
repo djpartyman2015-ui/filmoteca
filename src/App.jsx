@@ -618,22 +618,70 @@ const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, 
 
 // Perfis de usuário — cada um com sua própria lista separada no Firebase
 const PROFILES = {
-  andrey: { name: "Andrey", initial: "A", color: "#f5c518", photo: null },
-  rejane: { name: "Rejane", initial: "R", color: "#e0669a", photo: null },
+  andrey: { name: "Andrey", article: "do", initial: "A", color: "#f5c518" },
+  rejane: { name: "Rejane", article: "da", initial: "R", color: "#e0669a" },
+  disso: { name: "Disso", article: "do", initial: "D", color: "#4ac0c0" },
 };
 
-function ProfileAvatar({ id, size=100 }) {
+// Comprime a imagem escolhida (redimensiona + JPEG) pra caber tranquilo no Firestore
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const size = 240;
+        const canvas = document.createElement("canvas");
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        const s = Math.min(img.width, img.height);
+        const sx = (img.width - s) / 2, sy = (img.height - s) / 2;
+        ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function ProfileAvatar({ id, size=100, photoUrl, editable, onUpload }) {
   const p = PROFILES[id];
-  return p.photo ? (
-    <img src={p.photo} alt={p.name} style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", border:`2px solid ${p.color}` }} />
-  ) : (
-    <div style={{ width:size, height:size, borderRadius:"50%", background:`${p.color}22`, border:`2px solid ${p.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.4, fontWeight:"bold", color:p.color, fontFamily:"Georgia, serif" }}>
-      {p.initial}
+  const inputRef = { current: null };
+  return (
+    <div style={{ position:"relative", width:size, height:size }}>
+      {photoUrl ? (
+        <img src={photoUrl} alt={p.name} style={{ width:size, height:size, borderRadius:"50%", objectFit:"cover", border:`2px solid ${p.color}` }} />
+      ) : (
+        <div style={{ width:size, height:size, borderRadius:"50%", background:`${p.color}22`, border:`2px solid ${p.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.4, fontWeight:"bold", color:p.color, fontFamily:"Georgia, serif" }}>
+          {p.initial}
+        </div>
+      )}
+      {editable && (
+        <>
+          <label style={{
+            position:"absolute", bottom:-2, right:-2, width:size*0.32, height:size*0.32, minWidth:20, minHeight:20,
+            background:"#1a1520", border:`1.5px solid ${p.color}`, borderRadius:"50%",
+            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:size*0.16,
+          }}>
+            📷
+            <input type="file" accept="image/*" style={{ display:"none" }}
+              onChange={async e=>{
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const dataUrl = await compressImageFile(file);
+                onUpload(id, dataUrl);
+              }} />
+          </label>
+        </>
+      )}
     </div>
   );
 }
 
-function ProfileSelector({ onSelect }) {
+function ProfileSelector({ onSelect, photos, onUploadPhoto }) {
   return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:36, fontFamily:"Georgia, serif" }}>
       <div style={{ textAlign:"center" }}>
@@ -643,9 +691,11 @@ function ProfileSelector({ onSelect }) {
       </div>
       <div style={{ display:"flex", gap:40 }}>
         {Object.keys(PROFILES).map(id => (
-          <div key={id} onClick={()=>onSelect(id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, cursor:"pointer" }}>
-            <ProfileAvatar id={id} size={100} />
-            <span style={{ color:"#e8e0cc", fontSize:15 }}>{PROFILES[id].name}</span>
+          <div key={id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10 }}>
+            <div onClick={()=>onSelect(id)} style={{ cursor:"pointer" }}>
+              <ProfileAvatar id={id} size={100} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
+            </div>
+            <span onClick={()=>onSelect(id)} style={{ color:"#e8e0cc", fontSize:15, cursor:"pointer" }}>{PROFILES[id].name}</span>
           </div>
         ))}
       </div>
@@ -655,6 +705,7 @@ function ProfileSelector({ onSelect }) {
 
 export default function App() {
   const [profile, setProfile] = useState(() => localStorage.getItem("filmoteca_profile") || null);
+  const [profilePhotos, setProfilePhotos] = useState({});
   const [watched, setWatchedRaw] = useState([]);
   const [toWatch, setToWatchRaw] = useState([]);
   const [ready, setReady] = useState(false);
@@ -668,8 +719,8 @@ export default function App() {
   const [genreFilter, setGenreFilter] = useState(null);
 
   // Andrey mantém as chaves originais (dados já existentes). Rejane usa chaves próprias, separadas.
-  const watchedKey = profile==="rejane" ? "watched_v40_rejane" : "watched_v40";
-  const towatchKey = profile==="rejane" ? "towatch_v40_rejane" : "towatch_v40";
+  const watchedKey = profile==="andrey" ? "watched_v40" : `watched_v40_${profile}`;
+  const towatchKey = profile==="andrey" ? "towatch_v40" : `towatch_v40_${profile}`;
 
   const selectProfile = (id) => {
     localStorage.setItem("filmoteca_profile", id);
@@ -701,8 +752,18 @@ export default function App() {
     (async () => {
       const cachedPosters = await loadShared("poster_cache_v1", {});
       setPosterCache(cachedPosters || {});
+      const photos = await loadShared("profile_photos_v1", {});
+      setProfilePhotos(photos || {});
     })();
   }, []);
+
+  const uploadProfilePhoto = (id, dataUrl) => {
+    setProfilePhotos(prev => {
+      const next = { ...prev, [id]: dataUrl };
+      saveShared("profile_photos_v1", next);
+      return next;
+    });
+  };
 
   const cachePoster = (title, url) => {
     setPosterCache(prev => {
@@ -786,7 +847,7 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
-  if (!profile) return <ProfileSelector onSelect={selectProfile} />;
+  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} />;
 
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
@@ -800,7 +861,7 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca do {PROFILES[profile].name}</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca {PROFILES[profile].article} {PROFILES[profile].name}</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
@@ -812,7 +873,7 @@ export default function App() {
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
             <div onClick={switchProfile} title="Trocar usuário" style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-              <ProfileAvatar id={profile} size={34} />
+              <ProfileAvatar id={profile} size={34} photoUrl={profilePhotos[profile]} />
               <span style={{ fontSize:11, color:"#6a5a70", fontFamily:"monospace" }}>trocar</span>
             </div>
             <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
