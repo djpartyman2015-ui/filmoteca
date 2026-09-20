@@ -617,7 +617,7 @@ const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, 
 );
 
 // Perfis de usuário — cada um com sua própria lista separada no Firebase
-const PROFILES = {
+const DEFAULT_PROFILES = {
   andrey: { name: "Andrey", article: "do", initial: "A", color: "#f5c518" },
   rejane: { name: "Rejane", article: "da", initial: "R", color: "#e0669a" },
   disso: { name: "Disso", article: "do", initial: "D", color: "#4ac0c0" },
@@ -648,9 +648,9 @@ function compressImageFile(file) {
   });
 }
 
-function ProfileAvatar({ id, size=100, photoUrl, editable, onUpload }) {
-  const p = PROFILES[id];
-  const inputRef = { current: null };
+function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload }) {
+  const p = data;
+  if (!p) return null;
   return (
     <div style={{ position:"relative", width:size, height:size }}>
       {photoUrl ? (
@@ -683,7 +683,17 @@ function ProfileAvatar({ id, size=100, photoUrl, editable, onUpload }) {
   );
 }
 
-function ProfileSelector({ onSelect, photos, onUploadPhoto }) {
+function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfile }) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newArticle, setNewArticle] = useState("do");
+
+  const handleCreate = () => {
+    if (!newName.trim()) return;
+    const id = onAddProfile(newName, newArticle);
+    if (id) { setAdding(false); setNewName(""); setNewArticle("do"); onSelect(id); }
+  };
+
   return (
     <div style={{ minHeight:"100vh", width:"100%", maxWidth:"100vw", overflowX:"hidden", boxSizing:"border-box", background:"#0a0a0f", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:36, fontFamily:"Georgia, serif" }}>
       <div style={{ textAlign:"center" }}>
@@ -691,22 +701,67 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto }) {
         <div style={{ fontSize:11, letterSpacing:5, color:"#f5c518", textTransform:"uppercase", fontFamily:"monospace" }}>Filmoteca</div>
         <div style={{ fontSize:14, color:"#8a8070", marginTop:6 }}>Quem está usando?</div>
       </div>
-      <div style={{ display:"flex", gap:40 }}>
-        {Object.keys(PROFILES).map(id => (
-          <div key={id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10 }}>
+      <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"28px 24px", padding:"0 20px", maxWidth:420, boxSizing:"border-box" }}>
+        {Object.keys(profiles).map(id => (
+          <div key={id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:80 }}>
             <div onClick={()=>onSelect(id)} style={{ cursor:"pointer" }}>
-              <ProfileAvatar id={id} size={100} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
+              <ProfileAvatar id={id} data={profiles[id]} size={80} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
             </div>
-            <span onClick={()=>onSelect(id)} style={{ color:"#e8e0cc", fontSize:15, cursor:"pointer" }}>{PROFILES[id].name}</span>
+            <span onClick={()=>onSelect(id)} style={{ color:"#e8e0cc", fontSize:14, cursor:"pointer", textAlign:"center" }}>{profiles[id].name}</span>
           </div>
         ))}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:80 }}>
+          <div onClick={()=>setAdding(true)} style={{
+            width:80, height:80, borderRadius:"50%", border:"2px dashed #4a4a5a",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, color:"#6a6a7a", cursor:"pointer",
+          }}>+</div>
+          <span onClick={()=>setAdding(true)} style={{ color:"#6a6a7a", fontSize:12, cursor:"pointer", textAlign:"center" }}>Novo perfil</span>
+        </div>
       </div>
+
+      {adding && (
+        <div style={{ position:"fixed", inset:0, background:"#000000cc", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:20 }}>
+          <div style={{ background:"#14121c", border:"1px solid #3a2a50", borderRadius:14, padding:24, width:"100%", maxWidth:340, boxSizing:"border-box" }}>
+            <div style={{ fontSize:13, color:"#e8e0cc", marginBottom:14, fontFamily:"monospace", letterSpacing:1 }}>✨ NOVO PERFIL</div>
+            <input
+              value={newName}
+              onChange={e=>setNewName(e.target.value)}
+              placeholder="Nome"
+              autoFocus
+              style={{ width:"100%", boxSizing:"border-box", background:"#0e0c16", border:"1px solid #3a2a40", borderRadius:6, padding:"10px 12px", color:"#e8e0cc", fontSize:14, fontFamily:"Georgia, serif" }}
+            />
+            <div style={{ display:"flex", gap:8, marginTop:12 }}>
+              <button onClick={()=>setNewArticle("do")} style={{
+                flex:1, padding:"8px 4px", borderRadius:6, cursor:"pointer", fontSize:12,
+                border:`1px solid ${newArticle==="do" ? "#f5c518" : "#3a3040"}`,
+                background:newArticle==="do" ? "#f5c51822" : "none", color:"#e8e0cc",
+              }}>Masculino</button>
+              <button onClick={()=>setNewArticle("da")} style={{
+                flex:1, padding:"8px 4px", borderRadius:6, cursor:"pointer", fontSize:12,
+                border:`1px solid ${newArticle==="da" ? "#f5c518" : "#3a3040"}`,
+                background:newArticle==="da" ? "#f5c51822" : "none", color:"#e8e0cc",
+              }}>Feminino</button>
+            </div>
+            <div style={{ display:"flex", gap:8, marginTop:18 }}>
+              <button onClick={handleCreate} style={{
+                flex:2, padding:"10px", background:"#f5c518", color:"#0a0a0f", border:"none",
+                borderRadius:6, fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace",
+              }}>Criar perfil</button>
+              <button onClick={()=>{ setAdding(false); setNewName(""); }} style={{
+                flex:1, background:"none", border:"1px solid #3a3040", color:"#6a5a70",
+                borderRadius:6, padding:"10px", cursor:"pointer", fontSize:12,
+              }}>cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function App() {
   const [profile, setProfile] = useState(() => localStorage.getItem("filmoteca_profile") || null);
+  const [profiles, setProfiles] = useState(DEFAULT_PROFILES);
   const [profilePhotos, setProfilePhotos] = useState({});
   const [watched, setWatchedRaw] = useState([]);
   const [toWatch, setToWatchRaw] = useState([]);
@@ -756,6 +811,13 @@ export default function App() {
       setPosterCache(cachedPosters || {});
       const photos = await loadShared("profile_photos_v1", {});
       setProfilePhotos(photos || {});
+      const storedProfiles = await loadShared("profiles_v1", null);
+      if (storedProfiles) {
+        setProfiles({ ...DEFAULT_PROFILES, ...storedProfiles });
+      } else {
+        setProfiles(DEFAULT_PROFILES);
+        saveShared("profiles_v1", DEFAULT_PROFILES);
+      }
     })();
   }, []);
 
@@ -765,6 +827,24 @@ export default function App() {
       saveShared("profile_photos_v1", next);
       return next;
     });
+  };
+
+  const addProfile = (name, article) => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    let baseId = trimmed.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
+    if (!baseId) return null;
+    let id = baseId, n = 2;
+    while (profiles[id]) { id = baseId + n; n++; }
+    const colors = ["#f5c518","#e0669a","#4ac0c0","#9a6ae0","#e08a3c","#5ac95a","#5a8ee0","#e05a5a"];
+    const color = colors[Object.keys(profiles).length % colors.length];
+    const newProfile = { name: trimmed, article, initial: trimmed[0].toUpperCase(), color };
+    setProfiles(prev => {
+      const next = { ...prev, [id]: newProfile };
+      saveShared("profiles_v1", next);
+      return next;
+    });
+    return id;
   };
 
   const cachePoster = (title, url) => {
@@ -849,7 +929,7 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
-  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} />;
+  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} profiles={profiles} onAddProfile={addProfile} />;
 
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
@@ -863,7 +943,7 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca {PROFILES[profile].article} {PROFILES[profile].name}</div>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca {profiles[profile].article} {profiles[profile].name}</div>
             <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
@@ -875,7 +955,7 @@ export default function App() {
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
             <div onClick={switchProfile} title="Trocar usuário" style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
-              <ProfileAvatar id={profile} size={34} photoUrl={profilePhotos[profile]} />
+              <ProfileAvatar id={profile} data={profiles[profile]} size={34} photoUrl={profilePhotos[profile]} />
               <span style={{ fontSize:11, color:"#6a5a70", fontFamily:"monospace" }}>trocar</span>
             </div>
             <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
