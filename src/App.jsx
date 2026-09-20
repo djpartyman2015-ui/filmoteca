@@ -621,6 +621,7 @@ const PROFILES = {
   andrey: { name: "Andrey", article: "do", initial: "A", color: "#f5c518" },
   rejane: { name: "Rejane", article: "da", initial: "R", color: "#e0669a" },
   disso: { name: "Disso", article: "do", initial: "D", color: "#4ac0c0" },
+  fabita: { name: "Fabita", article: "da", initial: "F", color: "#9a6ae0" },
 };
 
 // Comprime a imagem escolhida (redimensiona + JPEG) pra caber tranquilo no Firestore
