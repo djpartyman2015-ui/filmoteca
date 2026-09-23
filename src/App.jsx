@@ -500,7 +500,66 @@ async function saveShared(key, value) {
     await setDoc(doc(db, "filmes", key), { value });
   } catch(e) { console.error(e); }
 }
-const WatchedCard = ({ film, posterCache, cachePoster, setEditData, removeFilm }) => (
+function ReactionsBar({ filmId, filmReactions, profile, viewing, profiles, hasUnread, onToggleReaction, onAddComment, onOpenComments }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const isOwner = viewing === profile;
+  const likes = filmReactions?.likes || {};
+  const comments = filmReactions?.comments || [];
+  const likeCount = Object.values(likes).filter(v=>v==="like").length;
+  const dislikeCount = Object.values(likes).filter(v=>v==="dislike").length;
+  const myReaction = likes[profile];
+
+  const toggleOpen = () => {
+    const next = !open;
+    setOpen(next);
+    if (next && isOwner) onOpenComments(filmId);
+  };
+
+  return (
+    <div style={{ marginTop:8, borderTop:"1px solid #201a28", paddingTop:8 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+        <button disabled={isOwner} onClick={()=>onToggleReaction(filmId,"like")} style={{
+          background:"none", border:"none", cursor:isOwner?"default":"pointer", fontSize:13,
+          color: myReaction==="like" ? "#5ac95a" : "#6a5a70", opacity:isOwner?0.4:1, display:"flex", alignItems:"center", gap:4,
+        }}>👍{likeCount>0 ? ` ${likeCount}` : ""}</button>
+        <button disabled={isOwner} onClick={()=>onToggleReaction(filmId,"dislike")} style={{
+          background:"none", border:"none", cursor:isOwner?"default":"pointer", fontSize:13,
+          color: myReaction==="dislike" ? "#e05a5a" : "#6a5a70", opacity:isOwner?0.4:1, display:"flex", alignItems:"center", gap:4,
+        }}>👎{dislikeCount>0 ? ` ${dislikeCount}` : ""}</button>
+        <button onClick={toggleOpen} style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:"#6a5a70", display:"flex", alignItems:"center", gap:4, position:"relative" }}>
+          💬{comments.length>0 ? ` ${comments.length}` : ""}
+          {hasUnread && <span style={{ position:"absolute", top:-3, right:-8, width:8, height:8, borderRadius:"50%", background:"#e05a5a" }} />}
+        </button>
+      </div>
+      {open && (
+        <div style={{ marginTop:8 }}>
+          {comments.length===0 && <div style={{ fontSize:11, color:"#5a5060", fontStyle:"italic" }}>Nenhum comentário ainda.</div>}
+          {comments.map(c => (
+            <div key={c.id} style={{ fontSize:12, color:"#c0b8d0", marginBottom:6, lineHeight:1.4 }}>
+              <strong style={{ color: profiles[c.from]?.color || "#f5c518" }}>{c.name}:</strong> {c.text}
+            </div>
+          ))}
+          {!isOwner && (
+            <div style={{ display:"flex", gap:6, marginTop:6 }}>
+              <input value={text} onChange={e=>setText(e.target.value)}
+                onKeyDown={e=>{ if(e.key==="Enter" && text.trim()){ onAddComment(filmId, text); setText(""); } }}
+                placeholder="Escreva um comentário..."
+                style={{ flex:1, background:"#0e0c16", border:"1px solid #3a2a40", borderRadius:6, padding:"6px 8px", color:"#e8e0cc", fontSize:12, boxSizing:"border-box" }} />
+              <button onClick={()=>{ if(text.trim()){ onAddComment(filmId, text); setText(""); } }} style={{
+                background:"#f5c518", border:"none", borderRadius:6, padding:"6px 10px", color:"#0a0a0f", fontSize:12, fontWeight:"bold", cursor:"pointer",
+              }}>Enviar</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const WatchedCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, profile, viewing, profiles, reactions, unreadFilmIds, onToggleReaction, onAddComment, onOpenComments }) => {
+  const readOnly = viewing !== profile;
+  return (
   <div style={{ background:"linear-gradient(135deg,#12100a,#0e0d08)", border:"1px solid #2a2030", borderLeft:`3px solid ${ratingColor(film.rating||0)}`, borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
     <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
       <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
@@ -526,17 +585,22 @@ const WatchedCard = ({ film, posterCache, cachePoster, setEditData, removeFilm }
             </div>
             <div style={{ display:"flex", gap:4 }}>
               <button onClick={()=>shareFilm(film,true)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
-              <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
-              <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
+              {!readOnly && <button onClick={()=>setEditData({film,from:"watched"})} style={{ background:"none", border:"1px solid #3a2a20", color:"#8a7a50", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>}
+              {!readOnly && <button onClick={()=>removeFilm(film.id,"watched")} style={{ background:"none", border:"none", color:"#4a3a2a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>}
             </div>
           </div>
         </div>
+        <ReactionsBar filmId={film.id} filmReactions={reactions[film.id]} profile={profile} viewing={viewing} profiles={profiles}
+          hasUnread={!!unreadFilmIds[film.id]} onToggleReaction={onToggleReaction} onAddComment={onAddComment} onOpenComments={onOpenComments} />
       </div>
     </div>
   </div>
-);
+  );
+};
 
-const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, ratingPick, setRatingPick, datePick, setDatePick, moveToWatched }) => (
+const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, ratingPick, setRatingPick, datePick, setDatePick, moveToWatched, profile, viewing, profiles, reactions, unreadFilmIds, onToggleReaction, onAddComment, onOpenComments }) => {
+  const readOnly = viewing !== profile;
+  return (
   <div style={{ background:"linear-gradient(135deg,#14121a,#100e18)", border:"1px solid #2a2030", borderLeft:"3px solid #7c3aed", borderRadius:10, padding:"14px 16px", marginBottom:12 }}>
     <div style={{ display:"flex", gap:12, alignItems:"flex-start" }}>
       <Poster title={film.title} year={film.year} mediaType={film.mediaType} size={70} cache={posterCache} onCache={cachePoster} />
@@ -555,12 +619,12 @@ const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, 
           </div>
           <div style={{ display:"flex", gap:4, alignItems:"flex-start" }}>
             <button onClick={()=>shareFilm(film,false)} style={{ background:"none", border:"1px solid #1a3a2a", color:"#25D366", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>📤</button>
-            <button onClick={()=>setEditData({film,from:"towatch"})} style={{ background:"none", border:"1px solid #3a2a50", color:"#9a7aba", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>
-            <button onClick={()=>removeFilm(film.id,"towatch")} style={{ background:"none", border:"none", color:"#4a3a3a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>
+            {!readOnly && <button onClick={()=>setEditData({film,from:"towatch"})} style={{ background:"none", border:"1px solid #3a2a50", color:"#9a7aba", borderRadius:6, padding:"3px 7px", cursor:"pointer", fontSize:11 }}>✏️</button>}
+            {!readOnly && <button onClick={()=>removeFilm(film.id,"towatch")} style={{ background:"none", border:"none", color:"#4a3a3a", cursor:"pointer", fontSize:14, padding:2 }}>✕</button>}
           </div>
         </div>
 
-        {ratingPick===film.id ? (
+        {!readOnly && (ratingPick===film.id ? (
           <div style={{ marginTop:10, borderTop:"1px solid #2a2030", paddingTop:10 }}>
             {/* PASSO 1: Data */}
             {!datePick[film.id+"_confirmed"] ? (
@@ -610,11 +674,14 @@ const ToWatchCard = ({ film, posterCache, cachePoster, setEditData, removeFilm, 
             marginTop:8, background:"none", border:"1px solid #3a2a50", color:"#9a7aba",
             borderRadius:6, padding:"4px 10px", fontSize:10, cursor:"pointer", fontFamily:"monospace",
           }}>✅ Marcar como assistido</button>
-        )}
+        ))}
+        <ReactionsBar filmId={film.id} filmReactions={reactions[film.id]} profile={profile} viewing={viewing} profiles={profiles}
+          hasUnread={!!unreadFilmIds[film.id]} onToggleReaction={onToggleReaction} onAddComment={onAddComment} onOpenComments={onOpenComments} />
       </div>
     </div>
   </div>
-);
+  );
+};
 
 // Perfis de usuário — cada um com sua própria lista separada no Firebase
 const DEFAULT_PROFILES = {
@@ -761,6 +828,7 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfi
 
 export default function App() {
   const [profile, setProfile] = useState(() => localStorage.getItem("filmoteca_profile") || null);
+  const [viewing, setViewing] = useState(null);
   const [profiles, setProfiles] = useState(DEFAULT_PROFILES);
   const [profilePhotos, setProfilePhotos] = useState({});
   const [watched, setWatchedRaw] = useState([]);
@@ -774,20 +842,34 @@ export default function App() {
   const [editData, setEditData] = useState(null);
   const [posterCache, setPosterCache] = useState({});
   const [genreFilter, setGenreFilter] = useState(null);
+  const [reactions, setReactions] = useState({});
+  const [ownReactions, setOwnReactions] = useState({});
+  const [notifSeen, setNotifSeen] = useState({});
+  const [showViewPicker, setShowViewPicker] = useState(false);
 
-  // Andrey mantém as chaves originais (dados já existentes). Rejane usa chaves próprias, separadas.
-  const watchedKey = profile==="andrey" ? "watched_v40" : `watched_v40_${profile}`;
-  const towatchKey = profile==="andrey" ? "towatch_v40" : `towatch_v40_${profile}`;
+  // Andrey mantém as chaves originais (dados já existentes). Demais usam chaves próprias, separadas.
+  // A lista exibida é sempre a de "viewing" (pode ser o próprio perfil ou o de outra pessoa, em modo visita).
+  const watchedKey = viewing==="andrey" ? "watched_v40" : `watched_v40_${viewing}`;
+  const towatchKey = viewing==="andrey" ? "towatch_v40" : `towatch_v40_${viewing}`;
 
   const selectProfile = (id) => {
     localStorage.setItem("filmoteca_profile", id);
     setProfile(id);
+    setViewing(id);
   };
   const switchProfile = () => {
     localStorage.removeItem("filmoteca_profile");
     setProfile(null);
+    setViewing(null);
     setReady(false);
     setWatchedRaw([]); setToWatchRaw([]);
+  };
+  const viewProfile = (id) => {
+    if (id === viewing) return;
+    setReady(false);
+    setGenreFilter(null);
+    setViewing(id);
+    setShowViewPicker(false);
   };
 
   const setWatched = (fn) => {
@@ -857,13 +939,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!profile) return;
+    if (!viewing) return;
     (async () => {
       const w = await loadShared(watchedKey, null);
       const t = await loadShared(towatchKey, null);
-      // SEED (filmes pré-existentes) só se aplica ao perfil do Andrey — Rejane começa com lista própria vazia
-      const seedW = profile==="andrey" ? SEED_WATCHED : [];
-      const seedT = profile==="andrey" ? SEED_TOWATCH : [];
+      // SEED (filmes pré-existentes) só se aplica ao perfil do Andrey — os demais começam com lista própria vazia
+      const seedW = viewing==="andrey" ? SEED_WATCHED : [];
+      const seedT = viewing==="andrey" ? SEED_TOWATCH : [];
 
       // Se Firebase está vazio, inicializa com SEED
       // Se Firebase tem dados, usa APENAS Firebase (source of truth)
@@ -891,11 +973,78 @@ export default function App() {
         setToWatchRaw(mergedT);
       }
 
+      const r = await loadShared(`reactions_v1_${viewing}`, {});
+      setReactions(r || {});
+
       setReady(true);
+    })();
+  }, [viewing]);
+
+  // Carrega as próprias reações (para calcular notificações de comentários novos) independente de qual lista está sendo visitada
+  useEffect(() => {
+    if (!profile) return;
+    (async () => {
+      const r = await loadShared(`reactions_v1_${profile}`, {});
+      setOwnReactions(r || {});
+      const seen = await loadShared(`notif_seen_v1_${profile}`, {});
+      setNotifSeen(seen || {});
     })();
   }, [profile]);
 
+  const unreadCount = Object.values(ownReactions).reduce((sum, filmR) => {
+    return sum + (filmR.comments||[]).filter(c => c.from!==profile && !notifSeen[c.id]).length;
+  }, 0);
+
+  const unreadFilmIds = {};
+  Object.entries(viewing===profile ? ownReactions : {}).forEach(([filmId, filmR]) => {
+    const hasUnread = (filmR.comments||[]).some(c => c.from!==profile && !notifSeen[c.id]);
+    if (hasUnread) unreadFilmIds[filmId] = true;
+  });
+
+  const toggleReaction = (filmId, type) => {
+    if (!viewing || viewing === profile) return;
+    setReactions(prev => {
+      const filmR = prev[filmId] || { likes:{}, comments:[] };
+      const currentType = filmR.likes[profile];
+      const nextLikes = { ...filmR.likes };
+      if (currentType === type) delete nextLikes[profile];
+      else nextLikes[profile] = type;
+      const nextFilmR = { ...filmR, likes: nextLikes };
+      const next = { ...prev, [filmId]: nextFilmR };
+      saveShared(`reactions_v1_${viewing}`, next);
+      return next;
+    });
+  };
+
+  const addComment = (filmId, text) => {
+    if (!text.trim() || !viewing || viewing === profile) return;
+    const comment = { id: `${Date.now()}_${Math.random().toString(36).slice(2,7)}`, from: profile, name: profiles[profile]?.name || profile, text: text.trim(), ts: Date.now() };
+    setReactions(prev => {
+      const filmR = prev[filmId] || { likes:{}, comments:[] };
+      const nextFilmR = { ...filmR, comments: [...(filmR.comments||[]), comment] };
+      const next = { ...prev, [filmId]: nextFilmR };
+      saveShared(`reactions_v1_${viewing}`, next);
+      return next;
+    });
+  };
+
+  const openComments = (filmId) => {
+    if (viewing !== profile) return;
+    const filmR = ownReactions[filmId];
+    if (!filmR || !filmR.comments?.length) return;
+    const newIds = filmR.comments.filter(c => c.from!==profile && !notifSeen[c.id]).map(c=>c.id);
+    if (!newIds.length) return;
+    setNotifSeen(prev => {
+      const next = { ...prev };
+      newIds.forEach(id => { next[id] = true; });
+      saveShared(`notif_seen_v1_${profile}`, next);
+      return next;
+    });
+  };
+
+
   const moveToWatched = (id, rating) => {
+    if (viewing !== profile) return;
     const film = toWatch.find(f=>f.id===id);
     if (!film) return;
     const date = datePick[id]||"";
@@ -907,11 +1056,13 @@ export default function App() {
   };
 
   const removeFilm = (id, from) => {
+    if (viewing !== profile) return;
     if (from==="watched") setWatched(prev=>prev.filter(f=>f.id!==id));
     else setToWatch(prev=>prev.filter(f=>f.id!==id));
   };
 
   const saveNew = (form) => {
+    if (viewing !== profile) return;
     const newFilm = {...form, id:Date.now(), year:Number(form.year)};
     if (addType==="watched") setWatched(prev=>[...prev, newFilm]);
     else setToWatch(prev=>[newFilm,...prev]);
@@ -919,6 +1070,7 @@ export default function App() {
   };
 
   const saveEdit = (updated) => {
+    if (viewing !== profile) return;
     const upd = {...updated, year:Number(updated.year)};
     if (editData.from==="watched") setWatched(prev=>prev.map(f=>f.id===upd.id?upd:f));
     else setToWatch(prev=>prev.map(f=>f.id===upd.id?upd:f));
@@ -943,27 +1095,55 @@ export default function App() {
         <FilmStrip />
         <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between", flexWrap:"wrap", gap:12, marginTop:8 }}>
           <div>
-            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca {profiles[profile].article} {profiles[profile].name}</div>
-            <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>Minha Lista de Filmes e Séries</h1>
+            <div style={{ fontSize:10, letterSpacing:6, color:"#f5c518", textTransform:"uppercase", marginBottom:4, fontFamily:"monospace" }}>🎬 Filmoteca {profiles[viewing]?.article} {profiles[viewing]?.name}</div>
+            <h1 style={{ margin:0, fontSize:26, fontWeight:"bold", color:"#fff", lineHeight:1.1 }}>{viewing===profile ? "Minha Lista de Filmes e Séries" : `Lista ${profiles[viewing]?.article} ${profiles[viewing]?.name}`}</h1>
             <div style={{ marginTop:6, display:"flex", gap:14, fontSize:12, color:"#8a8070", flexWrap:"wrap", alignItems:"center" }}>
               <span>✅ {watched.length} assistidos</span>
               <span>🎯 {toWatch.length} na fila</span>
               <span>⭐ Média: <strong style={{ color:"#f5c518" }}>{avgRating}</strong></span>
-              <span style={{ color:"#3a8a3a", fontSize:10 }}>🌐 lista compartilhada</span>
+              {viewing===profile && <span style={{ color:"#3a8a3a", fontSize:10 }}>🌐 lista compartilhada</span>}
+              {viewing!==profile && <span style={{ color:"#e0a53c", fontSize:10 }}>👀 modo visita</span>}
               <button onClick={async ()=>{ setReady(false); setTimeout(()=>window.location.reload(), 100); }} title="Forçar recarregamento do cache" style={{ background:"none", border:"1px solid #2a2a3a", color:"#4a4a6a", borderRadius:5, padding:"2px 7px", fontSize:10, cursor:"pointer", fontFamily:"monospace", letterSpacing:0.5 }}>↺</button>
             </div>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <div onClick={()=>setShowViewPicker(v=>!v)} title="Ver listas de outras pessoas" style={{ position:"relative", display:"flex", alignItems:"center", gap:6, cursor:"pointer", border:"1px solid #2a2a3a", borderRadius:20, padding:"5px 10px" }}>
+              <span style={{ fontSize:15 }}>👀</span>
+              <span style={{ fontSize:11, color:"#8a8070", fontFamily:"monospace" }}>ver outros</span>
+              {unreadCount>0 && (
+                <span style={{ position:"absolute", top:-6, right:-6, background:"#e05a5a", color:"#fff", borderRadius:"50%", width:18, height:18, fontSize:10, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"bold" }}>{unreadCount}</span>
+              )}
+            </div>
             <div onClick={switchProfile} title="Trocar usuário" style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer" }}>
               <ProfileAvatar id={profile} data={profiles[profile]} size={34} photoUrl={profilePhotos[profile]} />
               <span style={{ fontSize:11, color:"#6a5a70", fontFamily:"monospace" }}>trocar</span>
             </div>
-            <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
-              background:"#f5c518", color:"#0a0a0f", border:"none", borderRadius:6,
-              padding:"10px 16px", fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace", letterSpacing:1,
-            }}>+ ADICIONAR</button>
+            {viewing===profile && (
+              <button onClick={()=>{ setShowAdd(true); setAddType(tab==="watched"?"watched":"towatch"); }} style={{
+                background:"#f5c518", color:"#0a0a0f", border:"none", borderRadius:6,
+                padding:"10px 16px", fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace", letterSpacing:1,
+              }}>+ ADICIONAR</button>
+            )}
           </div>
         </div>
+
+        {showViewPicker && (
+          <div style={{ marginTop:14, padding:"12px 14px", background:"#14121c", border:"1px solid #2a2030", borderRadius:10, display:"flex", flexWrap:"wrap", gap:14 }}>
+            {Object.keys(profiles).map(id => (
+              <div key={id} onClick={()=>viewProfile(id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, cursor:"pointer", opacity: id===viewing ? 1 : 0.7 }}>
+                <ProfileAvatar id={id} data={profiles[id]} size={44} photoUrl={profilePhotos[id]} />
+                <span style={{ fontSize:10, color:"#8a8070", fontFamily:"monospace" }}>{profiles[id]?.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewing!==profile && (
+          <div style={{ marginTop:14, padding:"10px 14px", background:"#e0a53c15", border:"1px solid #e0a53c40", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8 }}>
+            <span style={{ fontSize:12, color:"#e0a53c" }}>👀 Você está vendo a lista {profiles[viewing]?.article} {profiles[viewing]?.name}. Pode curtir e comentar nos filmes!</span>
+            <button onClick={()=>viewProfile(profile)} style={{ background:"none", border:"1px solid #e0a53c", color:"#e0a53c", borderRadius:6, padding:"4px 10px", fontSize:11, cursor:"pointer" }}>← Minha lista</button>
+          </div>
+        )}
         <div style={{ display:"flex", marginTop:18, borderBottom:"1px solid #2a2520", overflowX:"auto" }}>
           {[{key:"watched",label:`✅ Assistidos (${watched.length})`},{key:"towatch",label:`🎯 A Assistir (${toWatch.length})`},{key:"stats",label:"📊 Estatísticas"}].map(t=>(
             <button key={t.key} onClick={()=>{setTab(t.key); setGenreFilter(null);}} style={{
@@ -985,13 +1165,13 @@ export default function App() {
           const filtered = genreFilter ? sortedWatched.filter(f => (f.genre||"Sem gênero")===genreFilter) : sortedWatched;
           return filtered.length===0
             ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme assistido ainda. 🍿</div>
-            : filtered.map(f => <WatchedCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} />);
+            : filtered.map(f => <WatchedCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} profile={profile} viewing={viewing} profiles={profiles} reactions={reactions} unreadFilmIds={unreadFilmIds} onToggleReaction={toggleReaction} onAddComment={addComment} onOpenComments={openComments} />);
         })()}
         {tab==="towatch" && (() => {
           const filtered = genreFilter ? toWatch.filter(f => (f.genre||"Sem gênero")===genreFilter) : toWatch;
           return filtered.length===0
             ? <div style={{ textAlign:"center",color:"#4a4040",padding:48 }}>Nenhum filme na fila! 🎬</div>
-            : filtered.map(f => <ToWatchCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} ratingPick={ratingPick} setRatingPick={setRatingPick} datePick={datePick} setDatePick={setDatePick} moveToWatched={moveToWatched} />);
+            : filtered.map(f => <ToWatchCard key={f.id} film={f} posterCache={posterCache} cachePoster={cachePoster} setEditData={setEditData} removeFilm={removeFilm} ratingPick={ratingPick} setRatingPick={setRatingPick} datePick={datePick} setDatePick={setDatePick} moveToWatched={moveToWatched} profile={profile} viewing={viewing} profiles={profiles} reactions={reactions} unreadFilmIds={unreadFilmIds} onToggleReaction={toggleReaction} onAddComment={addComment} onOpenComments={openComments} />);
         })()}
 
         {/* STATS TAB */}
