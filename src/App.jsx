@@ -828,7 +828,7 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfi
 
 export default function App() {
   const [profile, setProfile] = useState(() => localStorage.getItem("filmoteca_profile") || null);
-  const [viewing, setViewing] = useState(null);
+  const [viewing, setViewing] = useState(() => localStorage.getItem("filmoteca_profile") || null);
   const [profiles, setProfiles] = useState(DEFAULT_PROFILES);
   const [profilePhotos, setProfilePhotos] = useState({});
   const [watched, setWatchedRaw] = useState([]);
