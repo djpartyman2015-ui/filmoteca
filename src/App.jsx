@@ -717,6 +717,10 @@ const DEFAULT_PROFILES = {
   alebrantegani: { name: "Alê Brantegani", article: "do", initial: "A", color: "#5a8ee0" },
 };
 
+// Ordem alfabética dos perfis (pt-BR, ignora acentos e maiúsculas)
+const sortedIds = (profiles) => Object.keys(profiles).sort((a, b) =>
+  (profiles[a].name || "").localeCompare(profiles[b].name || "", "pt-BR", { sensitivity: "base" }));
+
 // Comprime a imagem escolhida (redimensiona + JPEG) pra caber tranquilo no Firestore
 function compressImageFile(file) {
   return new Promise((resolve, reject) => {
@@ -741,7 +745,7 @@ function compressImageFile(file) {
   });
 }
 
-function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload }) {
+function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload, count }) {
   const p = data;
   if (!p) return null;
   return (
@@ -752,6 +756,14 @@ function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload }) {
         <div style={{ width:size, height:size, borderRadius:"50%", background:`${p.color}22`, border:`2px solid ${p.color}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:size*0.4, fontWeight:"bold", color:p.color, fontFamily:"Georgia, serif" }}>
           {p.initial}
         </div>
+      )}
+      {count !== undefined && (
+        <div title={`${count} assistidos`} style={{
+          position:"absolute", top:-4, right:-4, minWidth:Math.max(18, size*0.28), height:Math.max(18, size*0.28),
+          padding:"0 5px", boxSizing:"border-box", borderRadius:20, background:"#f5c518", color:"#0a0a0f",
+          border:"2px solid #0a0a0f", display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:Math.max(10, size*0.15), fontWeight:"bold", fontFamily:"monospace", lineHeight:1,
+        }}>{count}</div>
       )}
       {editable && (
         <>
@@ -776,7 +788,7 @@ function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload }) {
   );
 }
 
-function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfile, onRenameProfile, onDeleteProfile }) {
+function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfile, onRenameProfile, onDeleteProfile, counts }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newArticle, setNewArticle] = useState("do");
@@ -822,11 +834,11 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfi
         <div style={{ fontSize:14, color:"#8a8070", marginTop:6 }}>Quem está usando?</div>
       </div>
       <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"28px 24px", padding:"0 20px", maxWidth:420, boxSizing:"border-box" }}>
-        {Object.keys(profiles).map(id => (
+        {sortedIds(profiles).map(id => (
           <div key={id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:80 }}>
             <div style={{ position:"relative", width:80, height:80 }}>
               <div onClick={()=>onSelect(id)} style={{ cursor:"pointer" }}>
-                <ProfileAvatar id={id} data={profiles[id]} size={80} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
+                <ProfileAvatar id={id} data={profiles[id]} size={80} photoUrl={photos[id]} editable onUpload={onUploadPhoto} count={counts[id]} />
               </div>
               <button onClick={()=>startEdit(id)} title="Editar perfil" style={{
                 position:"absolute", top:-4, left:-4, width:24, height:24, borderRadius:"50%",
@@ -968,6 +980,7 @@ export default function App() {
   const [ownReactions, setOwnReactions] = useState({});
   const [notifSeen, setNotifSeen] = useState({});
   const [showViewPicker, setShowViewPicker] = useState(false);
+  const [watchedCounts, setWatchedCounts] = useState({});
 
   // Andrey mantém as chaves originais (dados já existentes). Demais usam chaves próprias, separadas.
   // A lista exibida é sempre a de "viewing" (pode ser o próprio perfil ou o de outra pessoa, em modo visita).
@@ -1124,6 +1137,20 @@ export default function App() {
     })();
   }, [profile]);
 
+  // Quantidade de filmes assistidos de cada perfil (lê a lista de cada um; recarrega ao voltar para a seleção)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(Object.keys(profiles).map(async id => {
+        const key = id==="andrey" ? "watched_v40" : `watched_v40_${id}`;
+        const w = await loadShared(key, null);
+        return [id, Array.isArray(w) ? w.length : 0];
+      }));
+      if (!cancelled) setWatchedCounts(Object.fromEntries(results));
+    })();
+    return () => { cancelled = true; };
+  }, [Object.keys(profiles).join(","), profile]);
+
   const unreadCount = Object.values(ownReactions).reduce((sum, filmR) => {
     return sum + (filmR.comments||[]).filter(c => c.from!==profile && !notifSeen[c.id]).length;
   }, 0);
@@ -1214,7 +1241,7 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
-  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} profiles={profiles} onAddProfile={addProfile} onRenameProfile={renameProfile} onDeleteProfile={deleteProfile} />;
+  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} profiles={profiles} onAddProfile={addProfile} onRenameProfile={renameProfile} onDeleteProfile={deleteProfile} counts={watchedCounts} />;
 
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
@@ -1262,9 +1289,9 @@ export default function App() {
 
         {showViewPicker && (
           <div style={{ marginTop:14, padding:"12px 14px", background:"#14121c", border:"1px solid #2a2030", borderRadius:10, display:"flex", flexWrap:"wrap", gap:14 }}>
-            {Object.keys(profiles).map(id => (
+            {sortedIds(profiles).map(id => (
               <div key={id} onClick={()=>viewProfile(id)} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4, cursor:"pointer", opacity: id===viewing ? 1 : 0.7 }}>
-                <ProfileAvatar id={id} data={profiles[id]} size={44} photoUrl={profilePhotos[id]} />
+                <ProfileAvatar id={id} data={profiles[id]} size={44} photoUrl={profilePhotos[id]} count={id===viewing && ready ? watched.length : watchedCounts[id]} />
                 <span style={{ fontSize:10, color:"#8a8070", fontFamily:"monospace" }}>{profiles[id]?.name}</span>
               </div>
             ))}
