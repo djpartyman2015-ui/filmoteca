@@ -500,6 +500,24 @@ async function saveShared(key, value) {
     await setDoc(doc(db, "filmes", key), { value });
   } catch(e) { console.error(e); }
 }
+// Grava SÓ UM item dentro de um documento-mapa (merge), sem sobrescrever os demais.
+// Evita perder perfis/fotos quando o estado local está desatualizado.
+async function patchShared(key, id, value) {
+  try {
+    await setDoc(doc(db, "filmes", key), { value: { [id]: value } }, { merge: true });
+  } catch(e) { console.error(e); }
+}
+// Leitura estrita: null = documento não existe; erro de leitura é lançado (nunca confundido com "vazio").
+async function loadSharedStrict(key) {
+  const snap = await getDoc(doc(db, "filmes", key));
+  return snap.exists() ? snap.data().value : null;
+}
+// Junta os perfis do código com os do Firebase. Valor null = perfil excluído.
+function mergeProfiles(stored) {
+  const merged = { ...DEFAULT_PROFILES, ...(stored || {}) };
+  Object.keys(merged).forEach(k => { if (!merged[k]) delete merged[k]; });
+  return merged;
+}
 function ReactionsBar({ filmId, filmReactions, profile, viewing, profiles, hasUnread, onToggleReaction, onAddComment, onOpenComments }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -689,6 +707,14 @@ const DEFAULT_PROFILES = {
   rejane: { name: "Rejane", article: "da", initial: "R", color: "#e0669a" },
   disso: { name: "Disso", article: "do", initial: "D", color: "#4ac0c0" },
   fabita: { name: "Fabita", article: "da", initial: "F", color: "#9a6ae0" },
+  // Perfis restaurados (listas de filmes continuam salvas no Firebase sob estes ids)
+  pripataro: { name: "Pri Pátaro", article: "da", initial: "P", color: "#e08a3c" },
+  hariwallace: { name: "Hari/Wallace", article: "do", initial: "H", color: "#e05a5a" },
+  gicairo: { name: "Gi Cairo", article: "da", initial: "G", color: "#e0669a" },
+  gigi: { name: "Gigi", article: "da", initial: "G", color: "#f5c518" },
+  francine: { name: "Francine", article: "da", initial: "F", color: "#4ac0c0" },
+  prizanutto: { name: "Pri Zanutto", article: "da", initial: "P", color: "#5ac95a" },
+  alebrantegani: { name: "Alê Brantegani", article: "do", initial: "A", color: "#5a8ee0" },
 };
 
 // Comprime a imagem escolhida (redimensiona + JPEG) pra caber tranquilo no Firestore
@@ -750,15 +776,42 @@ function ProfileAvatar({ id, data, size=100, photoUrl, editable, onUpload }) {
   );
 }
 
-function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfile }) {
+function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfile, onRenameProfile, onDeleteProfile }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newArticle, setNewArticle] = useState("do");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editArticle, setEditArticle] = useState("do");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const handleCreate = () => {
-    if (!newName.trim()) return;
-    const id = onAddProfile(newName, newArticle);
-    if (id) { setAdding(false); setNewName(""); setNewArticle("do"); onSelect(id); }
+  const [creating, setCreating] = useState(false);
+  const handleCreate = async () => {
+    if (!newName.trim() || creating) return;
+    setCreating(true);
+    try {
+      const id = await onAddProfile(newName, newArticle);
+      if (id) { setAdding(false); setNewName(""); setNewArticle("do"); onSelect(id); }
+    } finally { setCreating(false); }
+  };
+
+  const startEdit = (id) => {
+    setEditingId(id);
+    setEditName(profiles[id].name);
+    setEditArticle(profiles[id].article || "do");
+    setConfirmDelete(false);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editName.trim()) return;
+    onRenameProfile(editingId, editName, editArticle);
+    setEditingId(null);
+  };
+
+  const handleDelete = () => {
+    onDeleteProfile(editingId);
+    setEditingId(null);
+    setConfirmDelete(false);
   };
 
   return (
@@ -771,8 +824,15 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfi
       <div style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"28px 24px", padding:"0 20px", maxWidth:420, boxSizing:"border-box" }}>
         {Object.keys(profiles).map(id => (
           <div key={id} style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:10, width:80 }}>
-            <div onClick={()=>onSelect(id)} style={{ cursor:"pointer" }}>
-              <ProfileAvatar id={id} data={profiles[id]} size={80} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
+            <div style={{ position:"relative", width:80, height:80 }}>
+              <div onClick={()=>onSelect(id)} style={{ cursor:"pointer" }}>
+                <ProfileAvatar id={id} data={profiles[id]} size={80} photoUrl={photos[id]} editable onUpload={onUploadPhoto} />
+              </div>
+              <button onClick={()=>startEdit(id)} title="Editar perfil" style={{
+                position:"absolute", top:-4, left:-4, width:24, height:24, borderRadius:"50%",
+                background:"#1a1520", border:"1.5px solid #6a5a70", color:"#c0b8d0",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, cursor:"pointer", padding:0,
+              }}>✎</button>
             </div>
             <span onClick={()=>onSelect(id)} style={{ color:"#e8e0cc", fontSize:14, cursor:"pointer", textAlign:"center" }}>{profiles[id].name}</span>
           </div>
@@ -818,6 +878,68 @@ function ProfileSelector({ onSelect, photos, onUploadPhoto, profiles, onAddProfi
                 flex:1, background:"none", border:"1px solid #3a3040", color:"#6a5a70",
                 borderRadius:6, padding:"10px", cursor:"pointer", fontSize:12,
               }}>cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingId && (
+        <div style={{ position:"fixed", inset:0, background:"#000000cc", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:20 }}>
+          <div style={{ background:"#14121c", border:"1px solid #3a2a50", borderRadius:14, padding:24, width:"100%", maxWidth:340, boxSizing:"border-box" }}>
+            <div style={{ fontSize:13, color:"#e8e0cc", marginBottom:14, fontFamily:"monospace", letterSpacing:1 }}>✎ EDITAR PERFIL</div>
+            <input
+              value={editName}
+              onChange={e=>setEditName(e.target.value)}
+              placeholder="Nome"
+              autoFocus
+              style={{ width:"100%", boxSizing:"border-box", background:"#0e0c16", border:"1px solid #3a2a40", borderRadius:6, padding:"10px 12px", color:"#e8e0cc", fontSize:14, fontFamily:"Georgia, serif" }}
+            />
+            <div style={{ display:"flex", gap:8, marginTop:12 }}>
+              <button onClick={()=>setEditArticle("do")} style={{
+                flex:1, padding:"8px 4px", borderRadius:6, cursor:"pointer", fontSize:12,
+                border:`1px solid ${editArticle==="do" ? "#f5c518" : "#3a3040"}`,
+                background:editArticle==="do" ? "#f5c51822" : "none", color:"#e8e0cc",
+              }}>Masculino</button>
+              <button onClick={()=>setEditArticle("da")} style={{
+                flex:1, padding:"8px 4px", borderRadius:6, cursor:"pointer", fontSize:12,
+                border:`1px solid ${editArticle==="da" ? "#f5c518" : "#3a3040"}`,
+                background:editArticle==="da" ? "#f5c51822" : "none", color:"#e8e0cc",
+              }}>Feminino</button>
+            </div>
+            <div style={{ display:"flex", gap:8, marginTop:18 }}>
+              <button onClick={handleSaveEdit} style={{
+                flex:2, padding:"10px", background:"#f5c518", color:"#0a0a0f", border:"none",
+                borderRadius:6, fontWeight:"bold", fontSize:13, cursor:"pointer", fontFamily:"monospace",
+              }}>Salvar</button>
+              <button onClick={()=>{ setEditingId(null); setConfirmDelete(false); }} style={{
+                flex:1, background:"none", border:"1px solid #3a3040", color:"#6a5a70",
+                borderRadius:6, padding:"10px", cursor:"pointer", fontSize:12,
+              }}>cancelar</button>
+            </div>
+
+            <div style={{ marginTop:20, paddingTop:16, borderTop:"1px solid #2a2030" }}>
+              {!confirmDelete ? (
+                <button onClick={()=>setConfirmDelete(true)} style={{
+                  width:"100%", background:"none", border:"1px solid #4a2a2a", color:"#c05a5a",
+                  borderRadius:6, padding:"8px", cursor:"pointer", fontSize:12,
+                }}>🗑️ Excluir este perfil</button>
+              ) : (
+                <>
+                  <div style={{ fontSize:11, color:"#c05a5a", marginBottom:8, lineHeight:1.4 }}>
+                    Tem certeza? O perfil sai da lista (os filmes dele ficam salvos, mas ninguém mais acessa por aqui).
+                  </div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={handleDelete} style={{
+                      flex:1, background:"#c05a5a22", border:"1px solid #c05a5a", color:"#e08a8a",
+                      borderRadius:6, padding:"8px", cursor:"pointer", fontSize:12, fontWeight:"bold",
+                    }}>Sim, excluir</button>
+                    <button onClick={()=>setConfirmDelete(false)} style={{
+                      flex:1, background:"none", border:"1px solid #3a3040", color:"#6a5a70",
+                      borderRadius:6, padding:"8px", cursor:"pointer", fontSize:12,
+                    }}>Cancelar</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -893,40 +1015,51 @@ export default function App() {
       setPosterCache(cachedPosters || {});
       const photos = await loadShared("profile_photos_v1", {});
       setProfilePhotos(photos || {});
-      const storedProfiles = await loadShared("profiles_v1", null);
-      if (storedProfiles) {
-        setProfiles({ ...DEFAULT_PROFILES, ...storedProfiles });
-      } else {
-        setProfiles(DEFAULT_PROFILES);
-        saveShared("profiles_v1", DEFAULT_PROFILES);
+      try {
+        const storedProfiles = await loadSharedStrict("profiles_v1");
+        setProfiles(mergeProfiles(storedProfiles));
+      } catch (e) {
+        console.error(e); // falha de leitura: mantém os padrões e NÃO grava nada
+        setProfiles(mergeProfiles(null));
       }
     })();
   }, []);
 
   const uploadProfilePhoto = (id, dataUrl) => {
-    setProfilePhotos(prev => {
-      const next = { ...prev, [id]: dataUrl };
-      saveShared("profile_photos_v1", next);
-      return next;
-    });
+    setProfilePhotos(prev => ({ ...prev, [id]: dataUrl }));
+    patchShared("profile_photos_v1", id, dataUrl);
   };
 
-  const addProfile = (name, article) => {
+  const addProfile = async (name, article) => {
     const trimmed = name.trim();
     if (!trimmed) return null;
     let baseId = trimmed.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "");
     if (!baseId) return null;
+    // Relê o Firebase para não colidir com perfis criados por outras pessoas/aparelhos
+    let latest = profiles;
+    try { latest = mergeProfiles(await loadSharedStrict("profiles_v1")); } catch (e) { console.error(e); }
     let id = baseId, n = 2;
-    while (profiles[id]) { id = baseId + n; n++; }
+    while (latest[id]) { id = baseId + n; n++; }
     const colors = ["#f5c518","#e0669a","#4ac0c0","#9a6ae0","#e08a3c","#5ac95a","#5a8ee0","#e05a5a"];
-    const color = colors[Object.keys(profiles).length % colors.length];
+    const color = colors[Object.keys(latest).length % colors.length];
     const newProfile = { name: trimmed, article, initial: trimmed[0].toUpperCase(), color };
-    setProfiles(prev => {
-      const next = { ...prev, [id]: newProfile };
-      saveShared("profiles_v1", next);
-      return next;
-    });
+    setProfiles({ ...latest, [id]: newProfile });
+    await patchShared("profiles_v1", id, newProfile);
     return id;
+  };
+
+  const renameProfile = (id, name, article) => {
+    const trimmed = name.trim();
+    if (!trimmed || !profiles[id]) return;
+    const updated = { ...profiles[id], name: trimmed, article, initial: trimmed[0].toUpperCase() };
+    setProfiles(prev => ({ ...prev, [id]: updated }));
+    patchShared("profiles_v1", id, updated);
+  };
+
+  const deleteProfile = (id) => {
+    if (!profiles[id]) return;
+    setProfiles(prev => { const next = { ...prev }; delete next[id]; return next; });
+    patchShared("profiles_v1", id, null); // null = excluído (também vale para perfis padrão do código)
   };
 
   const cachePoster = (title, url) => {
@@ -1081,7 +1214,7 @@ export default function App() {
   const avgRating = watched.length
     ? (watched.reduce((s,f)=>s+(f.rating||0),0)/watched.length).toFixed(1) : "—";
 
-  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} profiles={profiles} onAddProfile={addProfile} />;
+  if (!profile) return <ProfileSelector onSelect={selectProfile} photos={profilePhotos} onUploadPhoto={uploadProfilePhoto} profiles={profiles} onAddProfile={addProfile} onRenameProfile={renameProfile} onDeleteProfile={deleteProfile} />;
 
   if (!ready) return (
     <div style={{ minHeight:"100vh", background:"#0a0a0f", display:"flex", alignItems:"center", justifyContent:"center", color:"#f5c518", fontFamily:"monospace", fontSize:14, letterSpacing:3 }}>
